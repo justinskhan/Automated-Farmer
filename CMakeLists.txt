@@ -1,3 +1,15 @@
+cmake_minimum_required(VERSION 3.16)
+project(automated_farmer LANGUAGES C CXX)
+
+# Use C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Create executable
+add_executable(automated_farmer
+    src/main.cpp
+)
+
 # GLFW
 add_subdirectory(third_party/glfw)
 
@@ -8,16 +20,17 @@ target_include_directories(glad PUBLIC third_party/glad/include)
 # OpenGL (system)
 find_package(OpenGL REQUIRED)
 
-# Your app (must exist BEFORE linking)
-add_executable(automated_farmer src/main.cpp ...)
+# Link libraries
+target_link_libraries(automated_farmer
+    glfw
+    glad
+    OpenGL::GL
+)
 
-# Link everything
-target_link_libraries(automated_farmer glfw glad OpenGL::GL)
-
-# stb_image include path
+# stb_image
 target_include_directories(automated_farmer PRIVATE third_party/stb)
 
-# Linux extras (often needed)
-if(UNIX AND NOT APPLE)
-  target_link_libraries(automated_farmer dl pthread)
+# macOS requires this for OpenGL 3.3
+if(APPLE)
+    target_compile_definitions(automated_farmer PRIVATE GL_SILENCE_DEPRECATION)
 endif()
