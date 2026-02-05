@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/automated_farmer.dir/src/main.cpp.o -o automated_farmer  third_party/glfw/src/libglfw3.a libglad.a -framework OpenGL -framework Cocoa -framework IOKit -framework CoreFoundation
