@@ -6,13 +6,14 @@ A programming-driven automation game where players write Python code to control 
 
 ## 📦 Requirements
 
-- **CMake** ≥ 3.16  
-- **C++ Compiler** with C++17 support  
+- **CMake** ≥ 3.16
+- **C++ Compiler** with C++17 support
 - **OpenGL 3.3 Core**
 - **Python 3.10+**
 - **Git**
 
 ### Libraries (already included in repo)
+
 - GLFW
 - GLAD (OpenGL 3.3 Core)
 - stb_image
@@ -37,6 +38,7 @@ To run the program:
 ```
 
 Clean Rebuild:
+
 ```bash
 rm -rf build
 mkdir build
@@ -48,6 +50,7 @@ cmake --build .
 ## ✅ Build Sanity Check
 
 Your setup is correct if:
+
 - The project builds with no errors
 - A window titled **“OpenGL Test”** opens
 - The screen clears to a solid color
