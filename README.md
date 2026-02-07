@@ -1,4 +1,4 @@
-# Automated Farmer – Code-to-Grow Game
+# Automated Farmer – Code-to-Grow Game :>
 
 A programming-driven automation game where players write Python code to control a farmer in a grid-based world. The game is built with a C++ simulation engine, OpenGL rendering, Python scripting, and SQL persistence.
 
