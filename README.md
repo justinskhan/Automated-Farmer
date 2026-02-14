@@ -35,6 +35,8 @@ To run the program:
 
 ```bash
 ./automated_farmer
+
+Justin - You can also use .\Release\automated_farmer.exe
 ```
 
 Clean Rebuild:
