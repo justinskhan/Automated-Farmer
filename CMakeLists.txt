@@ -8,6 +8,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Create executable
 add_executable(automated_farmer
     src/main.cpp
+    scripts/Grid.cpp
+)
+# Telling compiler where to find headers
+target_include_directories(automated_farmer PRIVATE
+    ${CMAKE_SOURCE_DIR}/scripts
 )
 
 # GLFW

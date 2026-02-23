@@ -1,8 +1,9 @@
 #pragma once
-enum TileType { EMPTY, SOIL, CROP };
-enum crop { EMPTY, PLANTED, GROWN };
+enum class TileType { EMPTY, SOIL, CROP };
+enum  class CropState { EMPTY, PLANTED, GROWN }; //switched these to class to avoid empty conflicts 2/14/26
 
-struct Tile {
+struct Tile 
+{
     TileType type = TileType::EMPTY;
-    crop CropState = crop::EMPTY;
+    CropState cropstate = CropState::EMPTY;
 };

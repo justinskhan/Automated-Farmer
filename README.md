@@ -36,7 +36,9 @@ To run the program:
 ```bash
 ./automated_farmer
 
-Justin - You can also use .\Release\automated_farmer.exe
+Justin - You can also use the following
+cmake --build . --config Release
+ .\Release\automated_farmer.exe
 ```
 
 Clean Rebuild:
