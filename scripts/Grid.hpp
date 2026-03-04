@@ -11,6 +11,8 @@ class Grid
     // added for rendering tiles 2/14/26
     Tile& getTile(int x, int y);
     const Tile& getTile(int x, int y) const;
+
+    void tick();
     
     private:
     std::vector<std::vector<Tile>> TileVector;
