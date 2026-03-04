@@ -4,13 +4,21 @@
 
 enum direction {LEFT,UP,DOWN,RIGHT};
 
-class Farmer {
+class Farmer 
+{
     public:
-    Farmer(Grid& grid);
-    bool move(direction GivenDirection);
-    private:
-    Grid& grid;
-    int positionX = 0;
-    int positionY = 0;
+        Farmer(Grid& grid);
+        Farmer(Grid& grid, int startX, int startY);
+
+        bool move(direction GivenDirection);
+
+        int getX() const {return positionX;}
+        int getY() const {return positionY;}
+
+    private: 
+        Grid& grid;
+        int positionX = 0;
+        int positionY = 0;
+
 };
 

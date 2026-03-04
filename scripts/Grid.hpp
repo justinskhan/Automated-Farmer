@@ -1,11 +1,16 @@
 #pragma once
 #include <vector>
 #include "Tile.hpp"
-class Grid {
+class Grid 
+{
     public:
     Grid(int grid_width, int grid_height);
-    int getGridWidth();
-    int getGridHeight();
+    int getGridWidth() const;
+    int getGridHeight() const;
+
+    // added for rendering tiles 2/14/26
+    Tile& getTile(int x, int y);
+    const Tile& getTile(int x, int y) const;
     
     private:
     std::vector<std::vector<Tile>> TileVector;

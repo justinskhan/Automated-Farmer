@@ -1,8 +1,8 @@
 #include "Farmer.hpp"
 
-Farmer::Farmer(Grid& grid):grid(grid) {
+Farmer::Farmer(Grid& grid) : grid(grid), positionX(0), positionY(0) {}
 
-}
+Farmer::Farmer(Grid& grid, int startX, int startY) : grid(grid), positionX(startX), positionY(startY) {}
 
 bool Farmer::move(direction GivenDirection) {
     int oldX = positionX;
