@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include "Grid.hpp"
+#include "Farmer.hpp"
 
 // IMPORTANT: glad must be included before glfw
 //gives you access to openGL functions.
@@ -283,8 +284,8 @@ int main()
     grid.getTile(2, 0).type = TileType::CROP;
     grid.getTile(2, 0).cropstate = CropState::PLANTED;
 
-    int farmerX = 0;
-    int farmerY = 0;
+    // Use Farmer default constructor
+    Farmer farmer(grid);
 
     bool wPrev = false, aPrev = false, sPrev = false, dPrev = false;
     std::vector<float> tileVerts;
@@ -304,10 +305,10 @@ int main()
         bool s = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
         bool d = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
 
-        if (w && !wPrev) farmerY = std::max(0, farmerY - 1);
-        if (s && !sPrev) farmerY = std::min(grid.getGridHeight() - 1, farmerY + 1);
-        if (a && !aPrev) farmerX = std::max(0, farmerX - 1);
-        if (d && !dPrev) farmerX = std::min(grid.getGridWidth() - 1, farmerX + 1);
+        if (w && !wPrev) farmer.move(UP);
+        if (s && !sPrev) farmer.move(DOWN);
+        if (a && !aPrev) farmer.move(LEFT);
+        if (d && !dPrev) farmer.move(RIGHT);
 
         wPrev = w; aPrev = a; sPrev = s; dPrev = d;
 
@@ -318,8 +319,8 @@ int main()
 
         glUseProgram(program);
 
-        buildMeshesFromGrid(grid, farmerX, farmerY, tileVerts, borderVerts, farmerVerts);
-
+        buildMeshesFromGrid(grid, farmer.getX(), farmer.getY(), tileVerts, borderVerts, farmerVerts);
+        
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
