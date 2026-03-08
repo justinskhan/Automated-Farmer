@@ -6,4 +6,8 @@ struct Tile
 {
     TileType type = TileType::EMPTY;
     CropState cropstate = CropState::EMPTY;
+    // Timer
+    // Tick since planted
+    int growthTimer = 0;
+    static constexpr int GROWTH_TIME = 15;
 };

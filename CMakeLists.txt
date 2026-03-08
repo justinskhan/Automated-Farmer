@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(automated_farmer
     src/main.cpp
     scripts/Grid.cpp
+    scripts/Farmer.cpp
 )
 # Telling compiler where to find headers
 target_include_directories(automated_farmer PRIVATE

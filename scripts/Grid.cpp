@@ -29,3 +29,17 @@ const Tile& Grid::getTile(int x, int y) const
         throw std::out_of_range("getTile out of range");
     return TileVector[y][x];
 }
+
+void Grid::tick() {
+    for (int y = 0; y < grid_height; y++) {
+        for (int x = 0; x < grid_width; x++) {
+            Tile& t = TileVector[y][x];
+            if (t.type == TileType::CROP && t.cropstate == CropState::PLANTED) {
+                t.growthTimer++;
+                if(t.growthTimer >= Tile::GROWTH_TIME) {
+                    t.cropstate = CropState::GROWN;
+                }
+            }
+        }
+    }
+}
