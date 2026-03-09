@@ -11,6 +11,7 @@ A programming-driven automation game where players write Python code to control 
 - **OpenGL 3.3 Core**
 - **Python 3.10+**
 - **Git**
+- **Pygame
 
 ### Libraries (already included in repo)
 
