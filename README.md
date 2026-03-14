@@ -12,6 +12,7 @@ A programming-driven automation game where players write Python code to control 
 - **Python 3.10+**
 - **Git**
 - **Pygame
+- **Noting that you need pygame installed locally at least for me -JK 
 
 ### Libraries (already included in repo)
 
