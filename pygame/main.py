@@ -26,20 +26,26 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
+        #updating the window size 
         elif event.type == pygame.VIDEORESIZE:
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+            #center the level
             level.center_on(event.w, event.h)
+            #redraw the tile so it is back on the tile 
             farmer.snap_to_tile()
 
+        #passing an event to the IDE
         code = ide.handle_event(event)
         if code is not None:
-            # move("up" | "down" | "left" | "right") available in IDE
+            # moving up down right and left 
             def move(direction: str) -> None:
+                #find the tile the farmer is on 
                 pos = level.find_tile(farmer.current_tile)
+                #if the farmer isnt there exit
                 if pos is None:
                     return
                 r, c = pos
+                #map the direction of the movement using rows and columns 
                 deltas = {
                     "up":    (-1,  0),
                     "down":  ( 1,  0),
@@ -48,7 +54,9 @@ while running:
                 }
                 dr, dc = deltas.get(direction.lower(), (0, 0))
                 target = level.get_tile(r + dr, c + dc)
+                #move only if the target tile exists and the tile is walkable 
                 if target and target.walkable:
+                    #update the farmers tile 
                     farmer.current_tile = target
                     farmer._target_pos = [
                         float(target.rect.centerx),
@@ -57,6 +65,7 @@ while running:
                     farmer._arrived = False
 
             try:
+                #only work if move is in front of the text
                 exec(code, {"move": move})
             except Exception as e:
                 print(f"IDE error: {e}")

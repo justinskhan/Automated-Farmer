@@ -67,7 +67,7 @@ class IDE:
             _RUN_BTN_SZ,
             _RUN_BTN_SZ,
         )
-
+    #creating a rectangle "grip" on the bottom right of the IDE 
     def _grip_rect(self) -> pygame.Rect:
         return pygame.Rect(
             self.rect.right - _GRIP_SIZE,
@@ -75,23 +75,24 @@ class IDE:
             _GRIP_SIZE,
             _GRIP_SIZE,
         )
-
+    #this function runs everytime something happens in our IDE
+    #this includes mouseclicks, text typing, clicking around 
     def handle_event(self, event: pygame.event.Event) -> str | None:
-        """Returns the code string when Run is clicked, else None."""
+        #for mouse will only read LMB
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             pos = event.pos
 
-            # resize grip — check before anything else
+            #first we want to reisze the rectangle grip to make sure nothing breaks
             if self._grip_rect().collidepoint(pos):
                 self._resizing = True
                 self._resize_start = (pos[0], pos[1], self.rect.width, self.rect.height)
                 return None
 
-            # run button
+            # run button creation
             if self._run_btn_rect().collidepoint(pos):
                 return "\n".join(self.lines)
 
-            # title bar drag
+            # title bar being used to drag the window around 
             if self._title_rect().collidepoint(pos):
                 self._dragging = True
                 self._drag_offset = (pos[0] - self.rect.x, pos[1] - self.rect.y)
@@ -202,7 +203,7 @@ class IDE:
         pygame.draw.rect(surface, _BG, self.rect, border_radius=6)
         pygame.draw.rect(surface, _BORDER, self.rect, 1, border_radius=6)
 
-        # title bar
+        #title bar
         title_r = self._title_rect()
         pygame.draw.rect(surface, _TITLE_BG, title_r,
                          border_top_left_radius=6, border_top_right_radius=6)
@@ -210,7 +211,7 @@ class IDE:
         surface.blit(label, (title_r.x + _PADDING,
                               title_r.y + (_TITLE_H - label.get_height()) // 2))
 
-        # run button
+        #run button
         run_r = self._run_btn_rect()
         pygame.draw.rect(surface, _RUN_HOVER if self._run_hovered else _RUN_BTN,
                          run_r, border_radius=4)
@@ -222,7 +223,7 @@ class IDE:
             (tx + tw, ty + th // 2),
         ])
 
-        # code area (clipped)
+        #code area (clipped)
         text_area = pygame.Rect(self.rect.x, self.rect.y + _TITLE_H,
                                 self.rect.width, self.rect.height - _TITLE_H)
         old_clip = surface.get_clip()
@@ -250,7 +251,7 @@ class IDE:
 
         surface.set_clip(old_clip)
 
-        # resize on the bottom right corner
+        #resize on the bottom right corner
         grip = self._grip_rect()
         grip_col = (160, 160, 190) if self._grip_hovered else _GRIP
         for i in range(3):
