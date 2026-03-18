@@ -3,6 +3,7 @@ from background import Background
 from level import LevelManager
 from farmer import Farmer
 from ide import IDE
+from debug import print_grid
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
@@ -19,6 +20,7 @@ farmer.snap_to_tile()
 background = Background(color=(173, 216, 230))
 ide = IDE(20, 20)
 
+frame_count = 0 
 running = True
 while running:
     dt = clock.tick(60) / 1000.0
@@ -79,5 +81,10 @@ while running:
     ide.draw(screen)
 
     pygame.display.flip()
+
+    # Print debug for every 30 frames
+    frame_count += 1
+    if frame_count % 30 == 0:
+        print_grid(level)
 
 pygame.quit()
