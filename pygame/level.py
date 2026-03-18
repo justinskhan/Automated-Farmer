@@ -3,13 +3,13 @@ from tile import Tile
 from crop import Crop, CropType
 
 # key for grid
-#   '.' = regular walkable tile
-#   'X' = cant walk
-#   'W' = wheat crop
-#   'C' = corn crop
-#   'T' = tomato crop
-#   'R' = carrot crop
-#   'F' = this is where the farmer starts (required)
+# '.' = regular walkable tile
+# 'X' = cant walk
+# 'W' = wheat crop
+# 'C' = corn crop
+# 'T' = tomato crop
+# 'R' = carrot crop
+# 'F' = this is where the farmer starts (required for now)
 
 #with this level, you can see the name of the level is set along with the level number
 #the F means the player starts on top left corner with all the rest of the tiles being accessible
@@ -17,9 +17,9 @@ LEVEL_1 = {
     "name": "The Starter Farm",
     "number": 1,
     "grid": [
-        "F..",
-        "...",
-        "...",
+        "FW.",
+        "T..",
+        "..R",
     ],
 }
 
@@ -51,13 +51,14 @@ class Level:
     TILE_SIZE = 120 #default tile size before screen is resized
 
     def __init__(self, data: dict):
+        #initialization function pulls data from the dict 
         self.name: str = data["name"]
         self.number: int = data["number"]
         self.grid_data: list[str] = data["grid"]
 
-        self.rows: int = len(self.grid_data)
+        self.rows: int = len(self.grid_data) 
         self.cols: int = len(self.grid_data[0])
-        self.tiles: list[list[Tile]] = []
+        self.tiles: list[list[Tile]] = [] #holds the data until build runs 
         self.start_tile: Tile | None = None
 
         self._build()

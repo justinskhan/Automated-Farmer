@@ -63,7 +63,7 @@ class Farmer:
             self._arrived = False  #the farmer is moving
 
     #updating the farmer position
-    def update(self, dt: float, level: "Level") -> None:
+    def update(self, dt: float, level: "Level", accept_input: bool = True) -> None:
         self._move_cooldown = max(0.0, self._move_cooldown - dt)
 
         #movement animation for the farmer (will be changed)
