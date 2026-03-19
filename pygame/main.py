@@ -1,62 +1,90 @@
 import pygame
-from background import Background 
+from background import Background
 from level import LevelManager
 from farmer import Farmer
 from ide import IDE
+from debug import print_grid
 
-#initialize pygame 
 pygame.init()
-screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE) #pygame starts at 800x600 and is resizable
-pygame.display.set_caption("Automated Farmer") #title for the window 
+screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
+pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
 
-#level and farmer handler
-manager = LevelManager() #will load the current level user is on
-manager.current.center_on(*screen.get_size()) #this makes the grid in the center despite screen size
+manager = LevelManager()
+manager.current.center_on(*screen.get_size())
 
 level = manager.current
-farmer = Farmer(level.start_tile, level.TILE_SIZE) #creates farmer and needs the starting tile and the size of the tile
+farmer = Farmer(level.start_tile, level.TILE_SIZE)
 farmer.snap_to_tile()
 
-#background color
-background = Background(color=(173, 216, 230)) #color for background can be image in future 
+background = Background(color=(173, 216, 230))
+ide = IDE(20, 20)
 
-ide = IDE(*screen.get_size())
-
+frame_count = 0 
 running = True
 while running:
-    dt = clock.tick(60) / 1000.0 #this makes the game work at 60 fps instead of 30
+    dt = clock.tick(60) / 1000.0
 
-#function for when the game window is resized
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
+        #updating the window size 
         elif event.type == pygame.VIDEORESIZE:
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+            #center the level
             level.center_on(event.w, event.h)
+            #redraw the tile so it is back on the tile 
             farmer.snap_to_tile()
-            ide.resize(event.w, event.h)
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_TAB:
-                ide.toggle()
-            elif event.key == pygame.K_F5:
-                ide.run_code(farmer, level)
-            else:
-                ide.handle_event(event)
-        else:
-            ide.handle_event(event)
+        #passing an event to the IDE
+        code = ide.handle_event(event)
+        if code is not None:
+            # moving up down right and left 
+            def move(direction: str) -> None:
+                #find the tile the farmer is on 
+                pos = level.find_tile(farmer.current_tile)
+                #if the farmer isnt there exit
+                if pos is None:
+                    return
+                r, c = pos
+                #map the direction of the movement using rows and columns 
+                deltas = {
+                    "up":    (-1,  0),
+                    "down":  ( 1,  0),
+                    "left":  ( 0, -1),
+                    "right": ( 0,  1),
+                }
+                dr, dc = deltas.get(direction.lower(), (0, 0))
+                target = level.get_tile(r + dr, c + dc)
+                #move only if the target tile exists and the tile is walkable 
+                if target and target.walkable:
+                    #update the farmers tile 
+                    farmer.current_tile = target
+                    farmer._target_pos = [
+                        float(target.rect.centerx),
+                        float(target.rect.centery),
+                    ]
+                    farmer._arrived = False
 
-    # --- Update ---
-    ide.update(dt, farmer, level)
-    farmer.update(dt, level, block_input=ide._running) #updates the farmer when WASD is pressed or IDE commands run
+            try:
+                #only work if move is in front of the text
+                exec(code, {"move": move})
+            except Exception as e:
+                print(f"IDE error: {e}")
 
-    background.draw(screen) #first the background is created
-    level.draw(screen) #then the level on top
-    farmer.draw(screen) #then the farmer
+    farmer.update(dt, level, accept_input=not ide.focused)
+    ide.update(dt)
+
+    background.draw(screen)
+    level.draw(screen)
+    farmer.draw(screen)
     ide.draw(screen)
 
-    pygame.display.flip() #updates screen
+    pygame.display.flip()
 
-pygame.quit() #called when x is clicked
+    # Print debug for every 30 frames
+    frame_count += 1
+    if frame_count % 30 == 0:
+        print_grid(level)
+
+pygame.quit()

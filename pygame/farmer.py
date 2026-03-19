@@ -63,7 +63,7 @@ class Farmer:
             self._arrived = False  #the farmer is moving
 
     #updating the farmer position
-    def update(self, dt: float, level: "Level", block_input: bool = False) -> None:
+    def update(self, dt: float, level: "Level", accept_input: bool = True) -> None:
         self._move_cooldown = max(0.0, self._move_cooldown - dt)
 
         #movement animation for the farmer (will be changed)
@@ -83,32 +83,8 @@ class Farmer:
         self._arrived = arrived_x and arrived_y
 
         #makes it so each input waits for previous to finish
-        if self._arrived and not block_input:
+        if self._arrived:
             self.handle_input(level)
-
-    # --- programmable move methods for the in-game IDE ---
-    def _move(self, dr: int, dc: int, level: "Level") -> None:
-        pos = level.find_tile(self.current_tile)
-        if pos is None:
-            return
-        r, c = pos
-        target = level.get_tile(r + dr, c + dc)
-        if target and target.walkable:
-            self.current_tile = target
-            self._target_pos = [float(target.rect.centerx), float(target.rect.centery)]
-            self._arrived = False
-
-    def move_up(self, level: "Level") -> None:
-        self._move(-1, 0, level)
-
-    def move_down(self, level: "Level") -> None:
-        self._move(1, 0, level)
-
-    def move_left(self, level: "Level") -> None:
-        self._move(0, -1, level)
-
-    def move_right(self, level: "Level") -> None:
-        self._move(0, 1, level)
 
     def snap_to_tile(self) -> None:
         self.pixel_pos = [
