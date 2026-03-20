@@ -51,14 +51,14 @@ class Level:
     TILE_SIZE = 120 #default tile size before screen is resized
 
     def __init__(self, data: dict):
-        #initialization function pulls data from the dict 
+        #initialization function pulls data from the dict
         self.name: str = data["name"]
         self.number: int = data["number"]
         self.grid_data: list[str] = data["grid"]
 
-        self.rows: int = len(self.grid_data) 
+        self.rows: int = len(self.grid_data)
         self.cols: int = len(self.grid_data[0])
-        self.tiles: list[list[Tile]] = [] #holds the data until build runs 
+        self.tiles: list[list[Tile]] = [] #holds the data until build runs
         self.start_tile: Tile | None = None
 
         self._build()
@@ -77,7 +77,8 @@ class Level:
                 tile = Tile(x, y, self.TILE_SIZE, self.TILE_SIZE, walkable=walkable)
 
                 if ch in _CROP_MAP:
-                    tile.crop = Crop(_CROP_MAP[ch])
+                    #start all pre-placed crops fully grown
+                    tile.crop = Crop(_CROP_MAP[ch], start_growth=1.0)
 
                 if ch == "F":
                     self.start_tile = tile
@@ -146,7 +147,7 @@ class LevelManager:
         self.current = self._load(self._index)
         self.current.center_on(screen_w, screen_h)
         return True
-    
+
     #function to restart the level if needed (not implemented fully yet)
     def reload(self, screen_w: int, screen_h: int) -> None:
         self.current = self._load(self._index)
