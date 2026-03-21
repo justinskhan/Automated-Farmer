@@ -11,6 +11,9 @@ _BORDER      = ( 80,  80, 110)
 _RUN_BTN     = ( 50, 180,  80)
 _RUN_HOVER   = ( 70, 210, 100)
 _GRIP        = (100, 100, 130)
+_OUTPUT_BG   = ( 15,  15,  25)
+_OUTPUT_TEXT = (180, 220, 180)
+_ERROR_TEXT  = (220,  80,  80)
 
 _FONT_SIZE   = 14
 _TITLE_H     = 28
@@ -21,6 +24,7 @@ _RUN_BTN_SZ  = 20
 _GRIP_SIZE   = 14
 _MIN_W       = 200
 _MIN_H       = 120
+_OUTPUT_H    = 60
 
 #Goal: 
 #Setting an IDE window that mimics vscode that has a run button and is resizable  
@@ -51,14 +55,20 @@ class IDE:
         self._grip_hovered = False
         self._blink_timer = 0.0
         self._cursor_visible = True
+
+        #output panel messages and whether they are errors
+        self._output_lines: list[tuple[str, bool]] = []
+
     #this functions makes sure font isnt loaded until until needed
     def _font_obj(self) -> pygame.font.Font:
         if self._font is None:
             self._font = pygame.font.SysFont("Consolas", _FONT_SIZE)
         return self._font
+
     #helps relocate the IDE name
     def _title_rect(self) -> pygame.Rect:
         return pygame.Rect(self.rect.x, self.rect.y, self.rect.width, _TITLE_H)
+
     #run button creation
     def _run_btn_rect(self) -> pygame.Rect:
         return pygame.Rect(
@@ -67,6 +77,7 @@ class IDE:
             _RUN_BTN_SZ,
             _RUN_BTN_SZ,
         )
+
     #creating a rectangle "grip" on the bottom right of the IDE 
     def _grip_rect(self) -> pygame.Rect:
         return pygame.Rect(
@@ -75,6 +86,28 @@ class IDE:
             _GRIP_SIZE,
             _GRIP_SIZE,
         )
+
+    #returns the rect for the output panel at the bottom of the IDE
+    def _output_rect(self) -> pygame.Rect:
+        return pygame.Rect(
+            self.rect.x,
+            self.rect.bottom - _OUTPUT_H,
+            self.rect.width,
+            _OUTPUT_H,
+        )
+
+    #adds a message to the output panel
+    def log(self, message: str, error: bool = False) -> None:
+        #split multi line messages into separate lines
+        for line in message.splitlines():
+            self._output_lines.append((line, error))
+        #only keep the last few lines so panel doesnt overflow
+        self._output_lines = self._output_lines[-3:]
+
+    #clears the output panel
+    def clear_output(self) -> None:
+        self._output_lines = []
+
     #this function runs everytime something happens in our IDE
     #this includes mouseclicks, text typing, clicking around 
     def handle_event(self, event: pygame.event.Event) -> str | None:
@@ -90,6 +123,7 @@ class IDE:
 
             # run button creation
             if self._run_btn_rect().collidepoint(pos):
+                self.clear_output()
                 return "\n".join(self.lines)
 
             # title bar being used to drag the window around 
@@ -223,9 +257,10 @@ class IDE:
             (tx + tw, ty + th // 2),
         ])
 
-        #code area (clipped)
+        #code area (clipped) shrunk to make room for output panel
+        code_area_h = self.rect.height - _TITLE_H - _OUTPUT_H
         text_area = pygame.Rect(self.rect.x, self.rect.y + _TITLE_H,
-                                self.rect.width, self.rect.height - _TITLE_H)
+                                self.rect.width, code_area_h)
         old_clip = surface.get_clip()
         surface.set_clip(text_area)
 
@@ -237,7 +272,7 @@ class IDE:
 
         for i, line in enumerate(self.lines):
             ly = y0 + i * _LINE_H
-            if ly > self.rect.bottom:
+            if ly > text_area.bottom:
                 break
 
             num_surf = font.render(str(i + 1), True, _LINE_NUM)
@@ -251,12 +286,24 @@ class IDE:
 
         surface.set_clip(old_clip)
 
+        #output panel at the bottom of the IDE
+        out_r = self._output_rect()
+        pygame.draw.rect(surface, _OUTPUT_BG, out_r)
+        pygame.draw.line(surface, _BORDER, out_r.topleft, out_r.topright, 1)
+
+        surface.set_clip(out_r)
+        for i, (msg, is_error) in enumerate(self._output_lines):
+            color = _ERROR_TEXT if is_error else _OUTPUT_TEXT
+            surf = font.render(msg, True, color)
+            surface.blit(surf, (out_r.x + _PADDING, out_r.y + _PADDING + i * _LINE_H))
+        surface.set_clip(old_clip)
+
         #resize on the bottom right corner
         grip = self._grip_rect()
         grip_col = (160, 160, 190) if self._grip_hovered else _GRIP
         for i in range(3):
             offset = i * 4 + 2
-            #drawing the 3 lines on the bottom right 
+            #drawing the 3 lines on the bottom right
             pygame.draw.line(surface, grip_col,
                              (grip.right - offset, grip.bottom - 2),
                              (grip.right - 2, grip.bottom - offset), 1)

@@ -61,32 +61,41 @@ def plant(crop_name: str) -> None:
     #exit if the crop name isnt recognized
     crop_type = crop_map.get(crop_name.lower())
     if crop_type is None:
-        print(f"Unknown crop: {crop_name}")
+        ide.log(f"Unknown crop: {crop_name}", error=True)
         return
     tile = farmer.current_tile
     #only plant if the tile doesnt already have a crop
     if tile.crop is not None:
-        print("Tile already has a crop.")
+        ide.log("Tile already has a crop.", error=True)
         return
     tile.plant(Crop(crop_type, start_growth=1.0))
+    ide.log(f"Planted: {crop_name}")
 
 #harvests the crop on the tile the farmer is currently standing on
 def harvest() -> None:
     tile = farmer.current_tile
     #exit if there is no crop on the tile
     if tile.crop is None:
-        print("No crop to harvest here.")
+        ide.log("No crop to harvest here.", error=True)
         return
     #exit if the crop isnt fully grown yet
     if not tile.crop.grown:
-        print("Crop not ready to harvest yet.")
+        ide.log("Crop not ready to harvest yet.", error=True)
         return
     #remove the crop from the screen once harvested
-    print(f"Harvested: {tile.crop.crop_type.name}")
+    ide.log(f"Harvested: {tile.crop.crop_type.name}")
     tile.remove_crop()
 
 #holds the list of commands to run one at a time
 command_queue: list = []
+
+#checks the ast tree for any while true loops before running
+def has_infinite_loop(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.While):
+            if isinstance(node.test, ast.Constant) and node.test.value:
+                return True
+    return False
 
 frame_count = 0
 running = True
@@ -110,12 +119,20 @@ while running:
             try:
                 #parse each line into its own command and add to the queue
                 tree = ast.parse(code)
+                #catch infinite loops before they run
+                if has_infinite_loop(tree):
+                    ide.log("Error: infinite loop detected.", error=True)
+                else:
+                    ide.log("Running code...")
                 for node in tree.body:
-                    command_queue.append(
-                        compile(ast.Module([node], type_ignores=[]), "<ide>", "exec")
+                     command_queue.append(
+                     compile(ast.Module([node], type_ignores=[]), "<ide>", "exec")
                     )
+            except SyntaxError as e:
+                #show syntax errors in the ide output panel
+                ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
             except Exception as e:
-                print(f"IDE error: {e}")
+                ide.log(f"Error: {e}", error=True)
 
     #run the next command in the queue only when the farmer has arrived
     if command_queue and farmer._arrived:
@@ -123,7 +140,8 @@ while running:
         try:
             exec(cmd, {"move": move, "plant": plant, "harvest": harvest})
         except Exception as e:
-            print(f"IDE error: {e}")
+            #show runtime errors in the ide output panel
+            ide.log(f"Error: {e}", error=True)
 
     farmer.update(dt, level, accept_input=not ide.focused)
     ide.update(dt)
