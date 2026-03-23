@@ -265,20 +265,86 @@ class IDE:
                 self.selection_start = (row, col)
             elif not shift_pressed:
                 self.selection_start = None
-                
+
             self.cursor_col = len(self.lines[self.cursor_row])
+        
+        #Select All
+        elif event.key == pygame.K_a and ctrl_pressed:
+            self.selection_start = (0, 0)
+            self.cursor_row = len(self.lines) - 1
+            self.cursor_col = len(self.lines[-1])
 
         elif event.key == pygame.K_TAB:
+            if self.selection_start != None:
+                self._delete_selection()
             self.lines[row] = line[:col] + "    " + line[col:]
             self.cursor_col += 4
 
         elif event.unicode and event.unicode.isprintable():
+            if self.selection_start != None:
+                self._delete_selection()
             self.lines[row] = line[:col] + event.unicode + line[col:]
             self.cursor_col += 1
+    
+    # Deleting functions
+    def _clear_selection(self) -> None:
+        self.selection_start = None
+    
+    def _delete_selection(self) -> None:
+        if self.selection_start == None:
+            return
+        
+        start_row, start_col = self.selection_start
+        end_row, end_col = self.cursor_row, self.cursor_col
+
+        if (start_row, start_col) > (end_row, end_col):
+            start_row, start_col, end_row, end_col = end_row, end_col, start_row, start_col
+        
+        if start_row == end_row:
+            self.lines[start_row] = self.lines[start_row][:start_col] + self.lines[start_row][end_col:]
+        else:
+            self.lines[start_row] = self.lines[start_row][:start_col] + self.lines[end_row][end_col:]
+            del self.lines[start_row + 1:end_row + 1]
+
+        self.cursor_row = start_row
+        self.cursor_col = start_col
+        self.selection_start = None
+
+    def _draw_selection(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
+        """Draw selection highlight"""
+        if self.selection_start is None:
+            return
+        
+        start_row, start_col = self.selection_start
+        end_row, end_col = self.cursor_row, self.cursor_col
+        
+        # Normalize
+        if (start_row, start_col) > (end_row, end_col):
+            start_row, start_col, end_row, end_col = end_row, end_col, start_row, start_col
+        
+        selection_color = (100, 150, 200)  # Light blue
+        
+        # Calculate positions
+        text_x = self.rect.x + _LINE_NUM_W + _PADDING
+        text_y = self.rect.y + _TITLE_H + _PADDING
+        line_height = _LINE_H
+        
+        for row in range(start_row, end_row + 1):
+            col_start = start_col if row == start_row else 0
+            col_end = end_col if row == end_row else len(self.lines[row])
+            
+            x_start = text_x + col_start * 8  # Approximate char width
+            x_end = text_x + col_end * 8
+            y = text_y + (row - start_row + 1) * line_height
+            
+            pygame.draw.rect(surface, selection_color, (x_start, y, x_end - x_start, line_height), 0)
+
 
     def draw(self, surface: pygame.Surface) -> None:
         font = self._font_obj()
 
+        if self.selection_start != None:
+            self._draw_selection(surface, font)
         pygame.draw.rect(surface, _BG, self.rect, border_radius=6)
         pygame.draw.rect(surface, _BORDER, self.rect, 1, border_radius=6)
 
