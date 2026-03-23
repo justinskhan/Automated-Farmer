@@ -59,6 +59,9 @@ class IDE:
         #output panel messages and whether they are errors
         self._output_lines: list[tuple[str, bool]] = []
 
+        # Selection tracking in order to edit IDE quickly
+        self.selection_start = None
+
     #this functions makes sure font isnt loaded until until needed
     def _font_obj(self) -> pygame.font.Font:
         if self._font is None:
@@ -169,14 +172,21 @@ class IDE:
         row, col = self.cursor_row, self.cursor_col
         line = self.lines[row]
 
+        # Checking for selection mode
+        shift_pressed = pygame.key.get_mods() & pygame.KMOD_SHIFT
+        ctrl_pressed = pygame.key.get_mods() & pygame.KMOD_CTRL
+
         if event.key == pygame.K_RETURN:
+            self._clear_selection()
             self.lines[row] = line[:col]
             self.lines.insert(row + 1, line[col:])
             self.cursor_row += 1
             self.cursor_col = 0
 
         elif event.key == pygame.K_BACKSPACE:
-            if col > 0:
+            if self.selection_start != None:
+                self._delete_selection()
+            elif col > 0:
                 self.lines[row] = line[:col - 1] + line[col:]
                 self.cursor_col -= 1
             elif row > 0:
@@ -187,13 +197,21 @@ class IDE:
                 self.cursor_row -= 1
 
         elif event.key == pygame.K_DELETE:
-            if col < len(line):
+            if self.selection_start != None:
+                self._delete_selection()
+            elif col < len(line):
                 self.lines[row] = line[:col] + line[col + 1:]
             elif row < len(self.lines) - 1:
                 self.lines[row] = line + self.lines[row + 1]
                 self.lines.pop(row + 1)
 
         elif event.key == pygame.K_LEFT:
+            if shift_pressed:
+                if self.selection_start == None:
+                    self.selection_start = (row, col)
+            else:
+                self.selection_start = None
+
             if col > 0:
                 self.cursor_col -= 1
             elif row > 0:
@@ -201,6 +219,12 @@ class IDE:
                 self.cursor_col = len(self.lines[self.cursor_row])
 
         elif event.key == pygame.K_RIGHT:
+            if shift_pressed:
+                if self.selection_start == None:
+                    self.selection_start = (row, col)
+            else:
+                self.selection_start = None
+
             if col < len(line):
                 self.cursor_col += 1
             elif row < len(self.lines) - 1:
@@ -208,19 +232,40 @@ class IDE:
                 self.cursor_col = 0
 
         elif event.key == pygame.K_UP:
+            if shift_pressed:
+                if self.selection_start == None:
+                    self.selection_start = (row, col)
+            else:
+                self.selection_start = None
+
             if row > 0:
                 self.cursor_row -= 1
                 self.cursor_col = min(col, len(self.lines[self.cursor_row]))
 
         elif event.key == pygame.K_DOWN:
+            if shift_pressed:
+                if self.selection_start == None:
+                    self.selection_start = (row, col)
+            else:
+                self.selection_start = None
+
             if row < len(self.lines) - 1:
                 self.cursor_row += 1
                 self.cursor_col = min(col, len(self.lines[self.cursor_row]))
 
         elif event.key == pygame.K_HOME:
+            if shift_pressed and self.selection_start == None:
+                self.selection_start = (row, col)
+            elif not shift_pressed:
+                self.selection_start = None
             self.cursor_col = 0
 
         elif event.key == pygame.K_END:
+            if shift_pressed and self.selection_start == None:
+                self.selection_start = (row, col)
+            elif not shift_pressed:
+                self.selection_start = None
+                
             self.cursor_col = len(self.lines[self.cursor_row])
 
         elif event.key == pygame.K_TAB:
