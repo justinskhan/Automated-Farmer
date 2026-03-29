@@ -143,7 +143,7 @@ while running:
             #show runtime errors in the ide output panel
             ide.log(f"Error: {e}", error=True)
 
-    farmer.update(dt, level, accept_input=not ide.focused)
+    farmer.update(dt)
     ide.update(dt)
 
     background.draw(screen)
