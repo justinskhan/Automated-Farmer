@@ -128,6 +128,7 @@ while running:
                      command_queue.append(
                      compile(ast.Module([node], type_ignores=[]), "<ide>", "exec")
                     )
+                
             except SyntaxError as e:
                 #show syntax errors in the ide output panel
                 ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
