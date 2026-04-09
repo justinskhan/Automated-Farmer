@@ -8,27 +8,28 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
-
+ 
 pygame.init()
-pygame.key.set_repeat(400, 40) #this makes it so if you hold a key, there is a 400ms wait time before the key is printed to IDE again
+# hold a key for 400ms before it repeats in the IDE
+pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
 pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
-
+ 
 manager = LevelManager()
 manager.current.center_on(*screen.get_size())
-
+ 
 level   = manager.current
 farmer  = Farmer(level.start_tile, level.TILE_SIZE)
 farmer.snap_to_tile()
-
+ 
 background = Background(color=(173, 216, 230))
 ide        = IDE(20, 20)
 overlay    = Overlay()
-
-
+ 
+ 
+# restart the current level on fail
 def _reload_level() -> None:
-    """Restart the current level (fail → retry)."""
     global level, farmer
     manager.reload(*screen.get_size())
     level  = manager.current
@@ -36,23 +37,31 @@ def _reload_level() -> None:
     farmer.snap_to_tile()
     command_queue.clear()
     ide.clear_output()
+    # clear code in the IDE so the player starts fresh
+    ide.lines = [""]
+    ide.cursor_row = 0
+    ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
-
-
+ 
+ 
+# move to the next level on win
 def _advance_level() -> None:
-    """Move to the next level (win → continue)."""
     global level, farmer
     if not manager.next_level(*screen.get_size()):
-        #No more levels, just reload the last one for now
+        # no more levels, reload the last one for now
         manager.reload(*screen.get_size())
     level  = manager.current
     farmer = Farmer(level.start_tile, level.TILE_SIZE)
     farmer.snap_to_tile()
     command_queue.clear()
     ide.clear_output()
+    # clear code in the IDE so the player starts fresh on the new level
+    ide.lines = [""]
+    ide.cursor_row = 0
+    ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
-
-
+ 
+ 
 def move(direction: str) -> None:
     pos = level.find_tile(farmer.current_tile)
     if pos is None:
@@ -67,11 +76,11 @@ def move(direction: str) -> None:
     dr, dc = deltas.get(direction.lower(), (0, 0))
     target = level.get_tile(r + dr, c + dc)
     if target and target.walkable:
-        farmer.current_tile    = target
-        farmer._target_pos     = [float(target.rect.centerx), float(target.rect.centery)]
-        farmer._arrived        = False
-
-
+        farmer.current_tile = target
+        farmer._target_pos  = [float(target.rect.centerx), float(target.rect.centery)]
+        farmer._arrived     = False
+ 
+ 
 def plant(crop_name: str) -> None:
     if "plant" not in level.objective.allowed_commands:
         ide.log("plant() is locked on this level.", error=True)
@@ -90,10 +99,13 @@ def plant(crop_name: str) -> None:
     if tile.crop is not None:
         ide.log("Tile already has a crop.", error=True)
         return
-    tile.plant(Crop(crop_type, start_growth=1.0))
+    # plant() returns False if the tile is still on cooldown after a harvest
+    if not tile.plant(Crop(crop_type, start_growth=1.0)):
+        ide.log("Tile is recovering, wait before replanting.", error=True)
+        return
     ide.log(f"Planted: {crop_name}")
-
-
+ 
+ 
 def harvest() -> None:
     tile = farmer.current_tile
     if tile.crop is None:
@@ -105,25 +117,25 @@ def harvest() -> None:
     ide.log(f"Harvested: {tile.crop.crop_type.name}")
     tile.remove_crop()
     level.objective.record_harvest()
-
-
+ 
+ 
 command_queue: list = []
-
-
+ 
+ 
 def has_infinite_loop(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, ast.While):
             if isinstance(node.test, ast.Constant) and node.test.value:
                 return True
     return False
-
-
+ 
+ 
 def _while_loops_allowed() -> bool:
     return "while" in level.objective.allowed_commands
-
-
+ 
+ 
+# return an error string if the code uses a forbidden construct, else None
 def _check_forbidden_constructs(tree: ast.AST) -> str | None:
-    """Return an error string if the code uses a forbidden construct, else None."""
     for node in ast.walk(tree):
         if isinstance(node, ast.While) and not _while_loops_allowed():
             return "while loops are locked — reach level 5 to unlock them."
@@ -132,107 +144,106 @@ def _check_forbidden_constructs(tree: ast.AST) -> str | None:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             return "import statements are not allowed."
     return None
-
-
+ 
+ 
+# draw the level/objective panel and time box in the top-right corner
 def _draw_hud(surface: pygame.Surface, lv: "Level") -> None:
-    """Draw a level/objective panel and a separate time box in the top-right corner."""
     obj        = lv.objective
     font_title = pygame.font.SysFont("Consolas", 16, bold=True)
     font_body  = pygame.font.SysFont("Consolas", 14)
     font_time  = pygame.font.SysFont("Consolas", 22, bold=True)
     font_label = pygame.font.SysFont("Consolas", 11)
-
+ 
     padding = 10
     line_h  = 20
-    margin  = 12   #gap from screen edge and between boxes
-
-    # --- objective panel (level name + harvest progress) ---
+    margin  = 12
+ 
     obj_lines = [f"Level {lv.number}: {lv.name}", f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
-
-    #measure widest line so the panel always fits
+ 
+    # measure widest line so the panel always fits regardless of level name length
     panel_w = max(font_title.size(obj_lines[0])[0],
                   font_body.size(obj_lines[1])[0]) + padding * 2
     panel_h = padding * 2 + len(obj_lines) * line_h
-
+ 
     sx = surface.get_width() - panel_w - margin
     sy = margin
-
-    #semi-transparent dark background
+ 
+    # semi-transparent dark background
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 190))
     surface.blit(panel_surf, (sx, sy))
-
-    #border matching IDE style
+ 
+    # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
-
-    #level name in bright white-blue
+ 
+    # level name in bright white-blue
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
-
-    #harvest progress in green
+ 
+    # harvest progress in green
     surface.blit(font_body.render(obj_lines[1], True, (180, 220, 180)),
                  (sx + padding, sy + padding + line_h))
-
-    # --- time box drawn below the objective panel ---
-    time_box_w = panel_w          #same width so they line up nicely
+ 
+    # time box sits directly below the objective panel, same width so they align
+    time_box_w = panel_w
     time_box_h = 54
     tx = sx
-    ty = sy + panel_h + 6         #small gap between the two boxes
-
-    #pick time string and color based on whether a timer exists
+    ty = sy + panel_h + 6
+ 
+    # pick time string and color based on whether a timer exists
     t = obj.time_remaining
     if t is None:
-        time_str  = "Infinity"
-        time_col  = (160, 160, 200)   #muted purple-grey for no timer
+        time_str = "Infinity"
+        time_col = (160, 160, 200)
     else:
-        time_str  = f"{t:.1f}s"
+        time_str = f"{t:.1f}s"
         if t < 10:
-            time_col = (220, 80, 80)     #red when critical
+            time_col = (220, 80, 80)
         elif t < 20:
-            time_col = (230, 180, 50)    #yellow when warning
+            time_col = (230, 180, 50)
         else:
-            time_col = (180, 220, 180)   #green when plenty of time
-
-    #semi-transparent background for time box
+            time_col = (180, 220, 180)
+ 
+    # semi-transparent background for time box
     time_surf = pygame.Surface((time_box_w, time_box_h), pygame.SRCALPHA)
     time_surf.fill((15, 15, 25, 190))
     surface.blit(time_surf, (tx, ty))
-
-    #border matching IDE style
+ 
+    # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(tx, ty, time_box_w, time_box_h), 1, border_radius=4)
-
-    #small "TIME LEFT" label at the top of the box
+ 
+    # small label at the top of the time box
     label_surf = font_label.render("TIME LEFT", True, (120, 120, 160))
     surface.blit(label_surf, (tx + padding, ty + 6))
-
-    #big time number centered in the box
+ 
+    # large time number centered in the box
     time_render = font_time.render(time_str, True, time_col)
     time_x = tx + (time_box_w - time_render.get_width()) // 2
     time_y = ty + time_box_h - time_render.get_height() - 6
     surface.blit(time_render, (time_x, time_y))
-
-
+ 
+ 
 ide.update_allowed(level.objective.allowed_commands)
-
-
+ 
 frame_count = 0
 running     = True
-frozen      = False   # True when overlay is showing
-
+# frozen is True when the win/fail overlay is showing
+frozen      = False
+ 
 while running:
     dt = clock.tick(60) / 1000.0
-
+ 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
+ 
         elif event.type == pygame.VIDEORESIZE:
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             level.center_on(event.w, event.h)
             farmer.snap_to_tile()
-
+ 
         # overlay swallows all input while frozen
         if frozen:
             if overlay.handle_event(event):
@@ -242,15 +253,15 @@ while running:
                 else:
                     _reload_level()
                 frozen = False
-            continue   # don't pass events to IDE / farmer while frozen
-
-        # IDE input
+            # don't pass events to IDE or farmer while frozen
+            continue
+ 
+        # pass events to the IDE, run code if the run button was pressed
         code = ide.handle_event(event)
         if code is not None:
             try:
                 tree = ast.parse(code)
-
-                # check forbidden constructs first
+                # check forbidden constructs before queuing anything
                 err = _check_forbidden_constructs(tree)
                 if err:
                     ide.log(f"Error: {err}", error=True)
@@ -262,19 +273,18 @@ while running:
                         command_queue.append(
                             compile(ast.Module([node], type_ignores=[]), "<ide>", "exec")
                         )
-
             except SyntaxError as e:
                 ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
             except Exception as e:
                 ide.log(f"Error: {e}", error=True)
-
+ 
     if frozen:
-        # still need to draw
+        # still draw everything behind the overlay while frozen
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _draw_hud(screen, level)   #hud still visible while frozen
+        _draw_hud(screen, level)
         obj = level.objective
         overlay.draw(
             screen,
@@ -287,36 +297,39 @@ while running:
         )
         pygame.display.flip()
         continue
-
+ 
     obj = level.objective
     if obj.status == ObjectiveStatus.PLAYING:
         obj.update(dt)
-
+ 
+    # freeze the game as soon as the level ends
     if obj.status != ObjectiveStatus.PLAYING and not frozen:
         frozen = True
         command_queue.clear()
-
+ 
+    # execute one command per frame once the farmer has arrived at its tile
     if command_queue and farmer._arrived and not frozen:
         cmd = command_queue.pop(0)
         try:
             exec(cmd, {"move": move, "plant": plant, "harvest": harvest})
         except Exception as e:
             ide.log(f"Error: {e}", error=True)
-
+ 
     farmer.update(dt)
     ide.update(dt)
     level.update(dt, pygame.mouse.get_pos())
-
+ 
     background.draw(screen)
     level.draw(screen)
     farmer.draw(screen)
     ide.draw(screen)
-    _draw_hud(screen, level)   #draw the hud last so it sits on top of everything
-
+    # draw HUD last so it sits on top of everything
+    _draw_hud(screen, level)
+ 
     pygame.display.flip()
-
+ 
     frame_count += 1
     if frame_count % 30 == 0:
         print_grid(level)
-
+ 
 pygame.quit()
