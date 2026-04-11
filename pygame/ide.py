@@ -1,4 +1,5 @@
 import pygame
+import subprocess
  
 #setting colors for IDE and the text
 _BG          = ( 30,  30,  40)
@@ -17,6 +18,7 @@ _ERROR_TEXT  = (220,  80,  80)
 _TIMER_OK    = (180, 220, 180)   #green when plenty of time left
 _TIMER_WARN  = (230, 180,  50)   #yellow when under 20 seconds
 _TIMER_CRIT  = (220,  80,  80)   #red when under 10 seconds
+_SELECT_BG   = ( 70, 130, 180,  80)  #selection highlight color
  
 _FONT_SIZE   = 14
 _TITLE_H     = 28
@@ -58,6 +60,11 @@ class IDE:
         self._grip_hovered = False
         self._blink_timer = 0.0
         self._cursor_visible = True
+ 
+        #selection anchor — set when mouse is pressed, used to highlight a range
+        self._sel_anchor: tuple[int, int] | None = None
+        self._sel_end:    tuple[int, int] | None = None
+        self._mouse_selecting = False
  
         #output panel messages and whether they are errors
         self._output_lines: list[tuple[str, bool]] = []
@@ -116,6 +123,69 @@ class IDE:
             _OUTPUT_H,
         )
  
+    #converts a mouse position into a (row, col) cursor position in the text
+    def _pos_to_row_col(self, mx: int, my: int) -> tuple[int, int]:
+        font     = self._font_obj()
+        code_top = self.rect.y + _TITLE_H
+        code_x   = self.rect.x + _LINE_NUM_W + _PADDING
+        y0       = code_top + _PADDING
+ 
+        #clamp row to valid range
+        row = (my - y0) // _LINE_H
+        row = max(0, min(row, len(self.lines) - 1))
+ 
+        line = self.lines[row]
+        #find the character column closest to the mouse x position
+        col = 0
+        for i in range(len(line) + 1):
+            char_x = code_x + font.size(line[:i])[0]
+            if char_x > mx:
+                break
+            col = i
+        return row, col
+ 
+    #returns the normalised (start, end) of the current selection or None
+    def _selection_range(self) -> tuple[tuple[int, int], tuple[int, int]] | None:
+        if self._sel_anchor is None or self._sel_end is None:
+            return None
+        if self._sel_anchor == self._sel_end:
+            return None
+        a = self._sel_anchor
+        b = self._sel_end
+        #put the earlier position first
+        if (a[0], a[1]) > (b[0], b[1]):
+            a, b = b, a
+        return a, b
+ 
+    #returns all selected text as a single string
+    def _selected_text(self) -> str:
+        sel = self._selection_range()
+        if sel is None:
+            return ""
+        (r1, c1), (r2, c2) = sel
+        if r1 == r2:
+            return self.lines[r1][c1:c2]
+        parts = [self.lines[r1][c1:]]
+        for r in range(r1 + 1, r2):
+            parts.append(self.lines[r])
+        parts.append(self.lines[r2][:c2])
+        return "\n".join(parts)
+ 
+    #deletes the currently selected text and moves cursor to selection start
+    def _delete_selection(self) -> None:
+        sel = self._selection_range()
+        if sel is None:
+            return
+        (r1, c1), (r2, c2) = sel
+        before = self.lines[r1][:c1]
+        after  = self.lines[r2][c2:]
+        self.lines[r1] = before + after
+        del self.lines[r1 + 1 : r2 + 1]
+        self.cursor_row  = r1
+        self.cursor_col  = c1
+        self._sel_anchor = None
+        self._sel_end    = None
+ 
     #adds a message to the output panel
     def log(self, message: str, error: bool = False) -> None:
         #split multi line messages into separate lines
@@ -153,11 +223,30 @@ class IDE:
                 self.focused = True
                 return None
  
+            #click inside code area — move cursor to clicked line and column
+            code_area = pygame.Rect(
+                self.rect.x,
+                self.rect.y + _TITLE_H,
+                self.rect.width,
+                self.rect.height - _TITLE_H - _OUTPUT_H,
+            )
+            if code_area.collidepoint(pos):
+                self.focused = True
+                row, col = self._pos_to_row_col(*pos)
+                self.cursor_row       = row
+                self.cursor_col       = col
+                #start a new selection anchor at the clicked position
+                self._sel_anchor      = (row, col)
+                self._sel_end         = (row, col)
+                self._mouse_selecting = True
+                return None
+ 
             self.focused = self.rect.collidepoint(pos)
  
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            self._dragging = False
-            self._resizing = False
+            self._dragging        = False
+            self._resizing        = False
+            self._mouse_selecting = False
  
         elif event.type == pygame.MOUSEMOTION:
             mx, my = event.pos
@@ -170,6 +259,13 @@ class IDE:
                 ox, oy, ow, oh = self._resize_start
                 self.rect.width  = max(_MIN_W, ow + (mx - ox))
                 self.rect.height = max(_MIN_H, oh + (my - oy))
+ 
+            #drag to select text across lines
+            elif self._mouse_selecting and self.focused:
+                row, col         = self._pos_to_row_col(mx, my)
+                self._sel_end    = (row, col)
+                self.cursor_row  = row
+                self.cursor_col  = col
  
             self._run_hovered  = self._run_btn_rect().collidepoint(event.pos)
             self._grip_hovered = self._grip_rect().collidepoint(event.pos)
@@ -188,23 +284,71 @@ class IDE:
     def _handle_key(self, event: pygame.event.Event) -> None:
         row, col = self.cursor_row, self.cursor_col
         line = self.lines[row]
-        ctrl_pressed = pygame.key.get_mods() & pygame.KMOD_CTRL
+        ctrl_pressed  = pygame.key.get_mods() & pygame.KMOD_META
+        shift_pressed = pygame.key.get_mods() & pygame.KMOD_SHIFT
  
-        #Ctrl+A = Clear all
+        #Ctrl+A = select all lines
         if event.key == pygame.K_a and ctrl_pressed:
-            self.lines = [""]
-            self.cursor_row = 0
-            self.cursor_col = 0
+            self._sel_anchor = (0, 0)
+            last             = len(self.lines) - 1
+            self._sel_end    = (last, len(self.lines[last]))
+            self.cursor_row  = last
+            self.cursor_col  = len(self.lines[last])
+            return
+ 
+        #Cmd+C = copy selected text to clipboard using macOS pbcopy
+        if event.key == pygame.K_c and ctrl_pressed:
+            text = self._selected_text()
+            if text:
+                subprocess.run("pbcopy", input=text.encode(), check=True)
+            return
+ 
+        #Cmd+X = cut selected text to clipboard using macOS pbcopy
+        if event.key == pygame.K_x and ctrl_pressed:
+            text = self._selected_text()
+            if text:
+                subprocess.run("pbcopy", input=text.encode(), check=True)
+                self._delete_selection()
+            return
+ 
+        #Cmd+V = paste from clipboard using macOS pbpaste, handles multi-line text
+        if event.key == pygame.K_v and ctrl_pressed:
+            #delete any active selection before pasting
+            self._delete_selection()
+            text = subprocess.run("pbpaste", capture_output=True).stdout.decode()
+            if text:
+                #normalise line endings so windows and mac paste correctly
+                text = text.replace("\r\n", "\n").replace("\r", "\n")
+                row, col  = self.cursor_row, self.cursor_col
+                line      = self.lines[row]
+                before    = line[:col]
+                after     = line[col:]
+                paste_lines = text.split("\n")
+                self.lines[row] = before + paste_lines[0]
+                for i, pl in enumerate(paste_lines[1:], start=1):
+                    self.lines.insert(row + i, pl)
+                self.cursor_row = row + len(paste_lines) - 1
+                if len(paste_lines) == 1:
+                    self.cursor_col = col + len(paste_lines[0])
+                else:
+                    self.cursor_col = len(paste_lines[-1])
+                self.lines[self.cursor_row] += after
             return
  
         if event.key == pygame.K_RETURN:
+            #delete selection first if there is one
+            self._delete_selection()
+            row, col = self.cursor_row, self.cursor_col
+            line = self.lines[row]
             self.lines[row] = line[:col]
             self.lines.insert(row + 1, line[col:])
             self.cursor_row += 1
             self.cursor_col = 0
  
         elif event.key == pygame.K_BACKSPACE:
-            if col > 0:
+            if self._selection_range():
+                self._delete_selection()
+            elif col > 0:
                 self.lines[row] = line[:col - 1] + line[col:]
                 self.cursor_col -= 1
             elif row > 0:
@@ -215,13 +359,18 @@ class IDE:
                 self.cursor_row -= 1
  
         elif event.key == pygame.K_DELETE:
-            if col < len(line):
+            if self._selection_range():
+                self._delete_selection()
+            elif col < len(line):
                 self.lines[row] = line[:col] + line[col + 1:]
             elif row < len(self.lines) - 1:
                 self.lines[row] = line + self.lines[row + 1]
                 self.lines.pop(row + 1)
  
         elif event.key == pygame.K_LEFT:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             if col > 0:
                 self.cursor_col -= 1
             elif row > 0:
@@ -229,6 +378,9 @@ class IDE:
                 self.cursor_col = len(self.lines[self.cursor_row])
  
         elif event.key == pygame.K_RIGHT:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             if col < len(line):
                 self.cursor_col += 1
             elif row < len(self.lines) - 1:
@@ -236,32 +388,53 @@ class IDE:
                 self.cursor_col = 0
  
         elif event.key == pygame.K_UP:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             if row > 0:
                 self.cursor_row -= 1
                 self.cursor_col = min(col, len(self.lines[self.cursor_row]))
  
         elif event.key == pygame.K_DOWN:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             if row < len(self.lines) - 1:
                 self.cursor_row += 1
                 self.cursor_col = min(col, len(self.lines[self.cursor_row]))
  
         elif event.key == pygame.K_HOME:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             self.cursor_col = 0
  
         elif event.key == pygame.K_END:
+            if not shift_pressed:
+                self._sel_anchor = None
+                self._sel_end    = None
             self.cursor_col = len(self.lines[self.cursor_row])
  
         elif event.key == pygame.K_TAB:
-            self.lines[row] = line[:col] + "    " + line[col:]
+            self._delete_selection()
+            row, col = self.cursor_row, self.cursor_col
+            self.lines[row] = self.lines[row][:col] + "    " + self.lines[row][col:]
             self.cursor_col += 4
  
         elif event.unicode and event.unicode.isprintable():
-            self.lines[row] = line[:col] + event.unicode + line[col:]
+            #replace selection with the typed character if there is one
+            self._delete_selection()
+            row, col = self.cursor_row, self.cursor_col
+            self.lines[row] = self.lines[row][:col] + event.unicode + self.lines[row][col:]
             self.cursor_col += 1
  
     #creates the ide itself
     def draw(self, surface: pygame.Surface) -> None:
         font = self._font_obj()
+ 
+        #initialise clipboard support the first time we draw
+        if not pygame.scrap.get_init():
+            pygame.scrap.init()
  
         pygame.draw.rect(surface, _BG, self.rect, border_radius=6)
         pygame.draw.rect(surface, _BORDER, self.rect, 1, border_radius=6)
@@ -312,7 +485,9 @@ class IDE:
         pygame.draw.rect(surface, _LINE_NUM_BG, sidebar)
  
         code_x = self.rect.x + _LINE_NUM_W + _PADDING
-        y0 = text_area.y + _PADDING
+        y0     = text_area.y + _PADDING
+ 
+        sel = self._selection_range()
  
         for i, line in enumerate(self.lines):
             ly = y0 + i * _LINE_H
@@ -321,6 +496,21 @@ class IDE:
  
             num_surf = font.render(str(i + 1), True, _LINE_NUM)
             surface.blit(num_surf, (self.rect.x + _PADDING, ly))
+ 
+            #draw selection highlight behind the text for any selected rows
+            if sel is not None:
+                (r1, c1), (r2, c2) = sel
+                if r1 <= i <= r2:
+                    sel_c1 = c1 if i == r1 else 0
+                    sel_c2 = c2 if i == r2 else len(line)
+                    sx1 = code_x + font.size(line[:sel_c1])[0]
+                    sx2 = code_x + font.size(line[:sel_c2])[0]
+                    #extend highlight to end of row for lines in the middle of a selection
+                    if i < r2:
+                        sx2 = self.rect.right
+                    sel_surf = pygame.Surface((max(1, sx2 - sx1), _LINE_H), pygame.SRCALPHA)
+                    sel_surf.fill(_SELECT_BG)
+                    surface.blit(sel_surf, (sx1, ly))
  
             surface.blit(font.render(line, True, _TEXT), (code_x, ly))
  

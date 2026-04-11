@@ -1,5 +1,6 @@
 import pygame
 import ast
+import signal
 import threading
 from background import Background
 from level import LevelManager
@@ -15,6 +16,9 @@ pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
 pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
+ 
+# allow Ctrl+C in the terminal to quit the game cleanly
+signal.signal(signal.SIGINT, lambda s, f: pygame.event.post(pygame.event.Event(pygame.QUIT)))
  
 manager = LevelManager()
 manager.current.center_on(*screen.get_size())
