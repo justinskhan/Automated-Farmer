@@ -1,5 +1,6 @@
 import pygame
 import ast
+import threading
 from background import Background
 from level import LevelManager
 from farmer import Farmer
@@ -103,13 +104,76 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
     return btn_rect
  
  
+# three threading events coordinate the user thread and the game loop
+# _step_event is set by the game loop to tell the user thread the farmer arrived
+# _done_event is set by the user thread to tell the game loop a command was issued
+# _stop_event is set by the game loop to ask the user thread to exit cleanly
+_step_event = threading.Event()
+_done_event = threading.Event()
+_stop_event = threading.Event()
+_user_thread: threading.Thread | None = None
+ 
+ 
+def _stop_user_thread() -> None:
+    global _user_thread
+    if _user_thread and _user_thread.is_alive():
+        _stop_event.set()
+        # unblock the thread in case it is waiting on _step_event
+        _step_event.set()
+        _user_thread.join(timeout=1.0)
+    _user_thread = None
+    _stop_event.clear()
+    _step_event.clear()
+    _done_event.clear()
+ 
+ 
+def _wait_for_arrival() -> None:
+    # cancellation check before blocking so a stopped thread exits immediately
+    if _stop_event.is_set():
+        raise SystemExit
+    _done_event.set()      # tell game loop: command issued, wait for farmer
+    _step_event.wait()     # block until game loop says farmer has arrived
+    _step_event.clear()
+    # check again after waking up in case stop was requested while waiting
+    if _stop_event.is_set():
+        raise SystemExit
+ 
+ 
+def _launch_user_code(code: str) -> None:
+    global _user_thread
+    # stop any previously running thread before starting a new one
+    _stop_user_thread()
+ 
+    try:
+        compiled = compile(code, "<ide>", "exec")
+    except SyntaxError as e:
+        ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
+        return
+    except Exception as e:
+        ide.log(f"Error: {e}", error=True)
+        return
+ 
+    def _run() -> None:
+        try:
+            exec(compiled, {"move": move, "plant": plant, "harvest": harvest})
+        except SystemExit:
+            pass  # clean stop requested by the game, not a real error
+        except Exception as e:
+            ide.log(f"Error: {e}", error=True)
+ 
+    _step_event.clear()
+    _done_event.clear()
+    _user_thread = threading.Thread(target=_run, daemon=True)
+    _user_thread.start()
+ 
+ 
 def _reload_level() -> None:
     global level, farmer
+    _stop_user_thread()
     manager.reload(*screen.get_size())
     level  = manager.current
     farmer = Farmer(level.start_tile, level.TILE_SIZE)
     farmer.snap_to_tile()
-    command_queue.clear()
     ide.clear_output()
     ide.lines = [""]
     ide.cursor_row = 0
@@ -119,12 +183,12 @@ def _reload_level() -> None:
  
 def _advance_level() -> None:
     global level, farmer
+    _stop_user_thread()
     if not manager.next_level(*screen.get_size()):
         manager.reload(*screen.get_size())
     level  = manager.current
     farmer = Farmer(level.start_tile, level.TILE_SIZE)
     farmer.snap_to_tile()
-    command_queue.clear()
     ide.clear_output()
     ide.lines = [""]
     ide.cursor_row = 0
@@ -149,11 +213,13 @@ def move(direction: str) -> None:
         farmer.current_tile = target
         farmer._target_pos  = [float(target.rect.centerx), float(target.rect.centery)]
         farmer._arrived     = False
+    _wait_for_arrival()
  
  
 def plant(crop_name: str) -> None:
     if "plant" not in level.objective.allowed_commands:
         ide.log("plant() is locked on this level.", error=True)
+        _wait_for_arrival()
         return
     crop_map = {
         "wheat":  CropType.WHEAT,
@@ -164,39 +230,35 @@ def plant(crop_name: str) -> None:
     crop_type = crop_map.get(crop_name.lower())
     if crop_type is None:
         ide.log(f"Unknown crop: {crop_name}", error=True)
+        _wait_for_arrival()
         return
     tile = farmer.current_tile
     if tile.crop is not None:
         ide.log("Tile already has a crop.", error=True)
+        _wait_for_arrival()
         return
     if not tile.plant(Crop(crop_type, start_growth=1.0)):
         ide.log("Tile is recovering, wait before replanting.", error=True)
+        _wait_for_arrival()
         return
     ide.log(f"Planted: {crop_name}")
+    _wait_for_arrival()
  
  
 def harvest() -> None:
     tile = farmer.current_tile
     if tile.crop is None:
         ide.log("No crop to harvest here.", error=True)
+        _wait_for_arrival()
         return
     if not tile.crop.grown:
         ide.log("Crop not ready to harvest yet.", error=True)
+        _wait_for_arrival()
         return
     ide.log(f"Harvested: {tile.crop.crop_type.name}")
     tile.remove_crop()
     level.objective.record_harvest()
- 
- 
-command_queue: list = []
- 
- 
-def has_infinite_loop(tree: ast.AST) -> bool:
-    for node in ast.walk(tree):
-        if isinstance(node, ast.While):
-            if isinstance(node.test, ast.Constant) and node.test.value:
-                return True
-    return False
+    _wait_for_arrival()
  
  
 def _while_loops_allowed() -> bool:
@@ -336,18 +398,13 @@ while running:
         if code is not None:
             try:
                 tree = ast.parse(code)
-                # check forbidden constructs before queuing anything
+                # check forbidden constructs before launching the thread
                 err = _check_forbidden_constructs(tree)
                 if err:
                     ide.log(f"Error: {err}", error=True)
-                elif has_infinite_loop(tree):
-                    ide.log("Error: infinite loop detected.", error=True)
                 else:
                     ide.log("Running code...")
-                    for node in tree.body:
-                        command_queue.append(
-                            compile(ast.Module([node], type_ignores=[]), "<ide>", "exec")
-                        )
+                    _launch_user_code(code)
             except SyntaxError as e:
                 ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
             except Exception as e:
@@ -394,15 +451,18 @@ while running:
     # freeze the game as soon as the level ends
     if obj.status != ObjectiveStatus.PLAYING and not frozen:
         frozen = True
-        command_queue.clear()
+        _stop_user_thread()
  
-    # execute one command per frame once the farmer has arrived at its tile
-    if command_queue and farmer._arrived and not frozen:
-        cmd = command_queue.pop(0)
-        try:
-            exec(cmd, {"move": move, "plant": plant, "harvest": harvest})
-        except Exception as e:
-            ide.log(f"Error: {e}", error=True)
+    # once the farmer has arrived, signal the user thread to issue its next command
+    if (
+        not frozen
+        and _user_thread is not None
+        and _user_thread.is_alive()
+        and _done_event.is_set()
+        and farmer._arrived
+    ):
+        _done_event.clear()
+        _step_event.set()
  
     farmer.update(dt)
     ide.update(dt)
@@ -421,4 +481,5 @@ while running:
     if frame_count % 30 == 0:
         print_grid(level)
  
+_stop_user_thread()
 pygame.quit()
