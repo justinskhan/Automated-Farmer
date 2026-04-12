@@ -1,0 +1,1 @@
+pygame.key.set_repeat(400, 40)

@@ -10,43 +10,44 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
- 
+
 pygame.init()
 pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
 pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
- 
+
 # allow Ctrl+C in the terminal to quit the game cleanly
 signal.signal(signal.SIGINT, lambda s, f: pygame.event.post(pygame.event.Event(pygame.QUIT)))
- 
+
 manager = LevelManager()
 manager.current.center_on(*screen.get_size())
- 
+
 level   = manager.current
 farmer  = Farmer(level.start_tile, level.TILE_SIZE)
 farmer.snap_to_tile()
- 
+
 background = Background(color=(173, 216, 230))
 ide        = IDE(20, 20)
 overlay    = Overlay()
- 
+
 # game states
 STATE_START   = "start"
 STATE_PLAYING = "playing"
 game_state    = STATE_START
- 
+
 # start screen animation state
-_btn_hovered  = False
-_pulse_timer  = 0.0
- 
- 
+_btn_hovered      = False
+_pulse_timer      = 0.0
+_current_btn_rect = None
+
+
 def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
     sw, sh = surface.get_size()
- 
+
     # sky-blue background matching the game background color
     surface.fill((173, 216, 230))
- 
+
     # decorative dark panel behind the title area
     panel_w = 520
     panel_h = 280
@@ -55,19 +56,19 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 210))
     surface.blit(panel_surf, (panel_x, panel_y))
- 
+
     # subtitle tag line above the main title
     font_sub = pygame.font.SysFont("Consolas", 15)
     sub_surf = font_sub.render("< Learn to code through farming />", True, (100, 180, 100))
     surface.blit(sub_surf, (sw // 2 - sub_surf.get_width() // 2, panel_y + 28))
- 
+
     # main title — large bold text
     font_title = pygame.font.SysFont("Consolas", 52, bold=True)
     title_surf = font_title.render("Automated", True, (220, 240, 200))
     title2_surf = font_title.render("Farmer", True, (160, 210, 120))
     surface.blit(title_surf,  (sw // 2 - title_surf.get_width()  // 2, panel_y + 60))
     surface.blit(title2_surf, (sw // 2 - title2_surf.get_width() // 2, panel_y + 118))
- 
+
     # small decorative crop icons drawn as simple shapes below the title
     icons = [
         ((sw // 2 - 90, panel_y + 195), (210, 180, 50),  "sq"),   # wheat square
@@ -86,28 +87,28 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
             pts = [(ix, iy - 11), (ix - 10, iy + 9), (ix + 10, iy + 9)]
             pygame.draw.polygon(surface, col, pts)
             pygame.draw.polygon(surface, (0, 0, 0), pts, 1)
- 
+
     # play button — pulses slightly in size using the pulse timer
     btn_w  = int(160 + pulse * 6)
     btn_h  = int(48  + pulse * 3)
     btn_x  = sw // 2 - btn_w // 2
     btn_y  = panel_y + panel_h + 30
     btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
- 
+
     # brighter green when hovered
     btn_color = (70, 210, 100) if _btn_hovered else (50, 180, 80)
     pygame.draw.rect(surface, btn_color, btn_rect, border_radius=6)
     pygame.draw.rect(surface, (30, 100, 50), btn_rect, 2, border_radius=6)
- 
+
     # play text inside the button
     font_btn = pygame.font.SysFont("Consolas", 20, bold=True)
     btn_label = font_btn.render("PLAY", True, (255, 255, 255))
     surface.blit(btn_label, (sw // 2 - btn_label.get_width() // 2,
                               btn_y + btn_h // 2 - btn_label.get_height() // 2))
- 
+
     return btn_rect
- 
- 
+
+
 # three threading events coordinate the user thread and the game loop
 # _step_event is set by the game loop to tell the user thread the farmer arrived
 # _done_event is set by the user thread to tell the game loop a command was issued
@@ -116,8 +117,8 @@ _step_event = threading.Event()
 _done_event = threading.Event()
 _stop_event = threading.Event()
 _user_thread: threading.Thread | None = None
- 
- 
+
+
 def _stop_user_thread() -> None:
     global _user_thread
     if _user_thread and _user_thread.is_alive():
@@ -129,8 +130,8 @@ def _stop_user_thread() -> None:
     _stop_event.clear()
     _step_event.clear()
     _done_event.clear()
- 
- 
+
+
 def _wait_for_arrival() -> None:
     # cancellation check before blocking so a stopped thread exits immediately
     if _stop_event.is_set():
@@ -141,13 +142,13 @@ def _wait_for_arrival() -> None:
     # check again after waking up in case stop was requested while waiting
     if _stop_event.is_set():
         raise SystemExit
- 
- 
+
+
 def _launch_user_code(code: str) -> None:
     global _user_thread
     # stop any previously running thread before starting a new one
     _stop_user_thread()
- 
+
     try:
         compiled = compile(code, "<ide>", "exec")
     except SyntaxError as e:
@@ -156,7 +157,7 @@ def _launch_user_code(code: str) -> None:
     except Exception as e:
         ide.log(f"Error: {e}", error=True)
         return
- 
+
     def _run() -> None:
         try:
             exec(compiled, {"move": move, "plant": plant, "harvest": harvest})
@@ -164,13 +165,13 @@ def _launch_user_code(code: str) -> None:
             pass  # clean stop requested by the game, not a real error
         except Exception as e:
             ide.log(f"Error: {e}", error=True)
- 
+
     _step_event.clear()
     _done_event.clear()
     _user_thread = threading.Thread(target=_run, daemon=True)
     _user_thread.start()
- 
- 
+
+
 def _reload_level() -> None:
     global level, farmer
     _stop_user_thread()
@@ -183,8 +184,8 @@ def _reload_level() -> None:
     ide.cursor_row = 0
     ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
- 
- 
+
+
 def _advance_level() -> None:
     global level, farmer
     _stop_user_thread()
@@ -198,8 +199,8 @@ def _advance_level() -> None:
     ide.cursor_row = 0
     ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
- 
- 
+
+
 def move(direction: str) -> None:
     pos = level.find_tile(farmer.current_tile)
     if pos is None:
@@ -218,8 +219,8 @@ def move(direction: str) -> None:
         farmer._target_pos  = [float(target.rect.centerx), float(target.rect.centery)]
         farmer._arrived     = False
     _wait_for_arrival()
- 
- 
+
+
 def plant(crop_name: str) -> None:
     if "plant" not in level.objective.allowed_commands:
         ide.log("plant() is locked on this level.", error=True)
@@ -247,8 +248,8 @@ def plant(crop_name: str) -> None:
         return
     ide.log(f"Planted: {crop_name}")
     _wait_for_arrival()
- 
- 
+
+
 def harvest() -> None:
     tile = farmer.current_tile
     if tile.crop is None:
@@ -263,12 +264,12 @@ def harvest() -> None:
     tile.remove_crop()
     level.objective.record_harvest()
     _wait_for_arrival()
- 
- 
+
+
 def _while_loops_allowed() -> bool:
     return "while" in level.objective.allowed_commands
- 
- 
+
+
 def _check_forbidden_constructs(tree: ast.AST) -> str | None:
     for node in ast.walk(tree):
         if isinstance(node, ast.While) and not _while_loops_allowed():
@@ -278,52 +279,52 @@ def _check_forbidden_constructs(tree: ast.AST) -> str | None:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             return "import statements are not allowed."
     return None
- 
- 
-def _draw_hud(surface: pygame.Surface, lv) -> None:
+
+
+def _draw_hud(surface: pygame.Surface, lv) -> pygame.Rect:
     obj        = lv.objective
     font_title = pygame.font.SysFont("Consolas", 16, bold=True)
     font_body  = pygame.font.SysFont("Consolas", 14)
     font_time  = pygame.font.SysFont("Consolas", 22, bold=True)
     font_label = pygame.font.SysFont("Consolas", 11)
- 
+
     padding = 10
     line_h  = 20
     margin  = 12
- 
+
     obj_lines = [f"Level {lv.number}: {lv.name}", f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
- 
+
     # measure widest line so the panel always fits regardless of level name length
     panel_w = max(font_title.size(obj_lines[0])[0],
                   font_body.size(obj_lines[1])[0]) + padding * 2
     panel_h = padding * 2 + len(obj_lines) * line_h
- 
+
     sx = surface.get_width() - panel_w - margin
     sy = margin
- 
+
     # semi-transparent dark background
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 190))
     surface.blit(panel_surf, (sx, sy))
- 
+
     # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
- 
+
     # level name in bright white-blue
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
- 
+
     # harvest progress in green
     surface.blit(font_body.render(obj_lines[1], True, (180, 220, 180)),
                  (sx + padding, sy + padding + line_h))
- 
+
     # time box sits directly below the objective panel, same width so they align
     time_box_w = panel_w
     time_box_h = 54
     tx = sx
     ty = sy + panel_h + 6
- 
+
     # pick time string and color based on whether a timer exists
     t = obj.time_remaining
     if t is None:
@@ -337,46 +338,81 @@ def _draw_hud(surface: pygame.Surface, lv) -> None:
             time_col = (230, 180, 50)
         else:
             time_col = (180, 220, 180)
- 
+
     # semi-transparent background for time box
     time_surf = pygame.Surface((time_box_w, time_box_h), pygame.SRCALPHA)
     time_surf.fill((15, 15, 25, 190))
     surface.blit(time_surf, (tx, ty))
- 
+
     # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(tx, ty, time_box_w, time_box_h), 1, border_radius=4)
- 
+
     # small label at the top of the time box
     label_surf = font_label.render("TIME LEFT", True, (120, 120, 160))
     surface.blit(label_surf, (tx + padding, ty + 6))
- 
+
     # large time number centered in the box
     time_render = font_time.render(time_str, True, time_col)
     time_x = tx + (time_box_w - time_render.get_width()) // 2
     time_y = ty + time_box_h - time_render.get_height() - 6
     surface.blit(time_render, (time_x, time_y))
- 
- 
+
+    # Center IDE button sits directly below the time box, same width and style
+    btn_w = time_box_w
+    btn_h = time_box_h
+    bx    = tx
+    by    = ty + time_box_h + 6
+
+    center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
+    btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())
+
+    # background — slightly brighter on hover to signal it is clickable
+    btn_bg_col = (30, 30, 45, 210) if btn_hovered else (15, 15, 25, 190)
+    btn_bg = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
+    btn_bg.fill(btn_bg_col)
+    surface.blit(btn_bg, (bx, by))
+
+    # border matching the rest of the HUD panels
+    pygame.draw.rect(surface, (80, 80, 110), center_btn_rect, 1, border_radius=4)
+
+    # white label centered in the box
+    font_btn = pygame.font.SysFont("Consolas", 14, bold=True)
+    lbl = font_btn.render("Center IDE", True, (255, 255, 255))
+    surface.blit(lbl, (bx + (btn_w - lbl.get_width()) // 2,
+                        by + (btn_h - lbl.get_height()) // 2))
+
+    return center_btn_rect
+
+
 ide.update_allowed(level.objective.allowed_commands)
- 
+
 frame_count = 0
 running     = True
 frozen      = False
- 
+_center_btn: pygame.Rect | None = None
+
 while running:
     dt = clock.tick(60) / 1000.0
- 
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
- 
+
         elif event.type == pygame.VIDEORESIZE:
+            old_w, old_h = screen.get_size()
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             if game_state == STATE_PLAYING:
+                # scale the IDE proportionally so it moves with the window like the other UI
+                sx = event.w / old_w
+                sy = event.h / old_h
+                ide.rect.x      = int(ide.rect.x      * sx)
+                ide.rect.y      = int(ide.rect.y      * sy)
+                ide.rect.width  = max(200, int(ide.rect.width  * sx))
+                ide.rect.height = max(120, int(ide.rect.height * sy))
                 level.center_on(event.w, event.h)
                 farmer.snap_to_tile()
- 
+
         # handle start screen clicks
         if game_state == STATE_START:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -384,7 +420,7 @@ while running:
                     game_state = STATE_PLAYING
                     level.center_on(*screen.get_size())
             continue
- 
+
         # overlay swallows all input while frozen
         if frozen:
             if overlay.handle_event(event):
@@ -396,7 +432,16 @@ while running:
                 frozen = False
             # don't pass events to IDE or farmer while frozen
             continue
- 
+
+        # Center IDE button — reset IDE to its original position and size
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and _center_btn and _center_btn.collidepoint(event.pos)):
+            ide.rect.x      = 20
+            ide.rect.y      = 20
+            ide.rect.width  = IDE.WIDTH
+            ide.rect.height = IDE.HEIGHT
+            continue
+
         # pass events to the IDE, run code if the run button was pressed
         code = ide.handle_event(event)
         if code is not None:
@@ -413,7 +458,7 @@ while running:
                 ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
             except Exception as e:
                 ide.log(f"Error: {e}", error=True)
- 
+
     # draw and update the start screen
     if game_state == STATE_START:
         import math
@@ -424,17 +469,17 @@ while running:
         _btn_hovered = _current_btn_rect.collidepoint(mouse_pos)
         pygame.display.flip()
         continue
- 
+
     # keep a reference to the button rect for hit testing
     _current_btn_rect = None
- 
+
     if frozen:
         # still draw everything behind the overlay while frozen
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _draw_hud(screen, level)
+        _center_btn = _draw_hud(screen, level)
         obj = level.objective
         overlay.draw(
             screen,
@@ -447,16 +492,16 @@ while running:
         )
         pygame.display.flip()
         continue
- 
+
     obj = level.objective
     if obj.status == ObjectiveStatus.PLAYING:
         obj.update(dt)
- 
+
     # freeze the game as soon as the level ends
     if obj.status != ObjectiveStatus.PLAYING and not frozen:
         frozen = True
         _stop_user_thread()
- 
+
     # once the farmer has arrived, signal the user thread to issue its next command
     if (
         not frozen
@@ -467,23 +512,23 @@ while running:
     ):
         _done_event.clear()
         _step_event.set()
- 
+
     farmer.update(dt)
     ide.update(dt)
     level.update(dt, pygame.mouse.get_pos())
- 
+
     background.draw(screen)
     level.draw(screen)
     farmer.draw(screen)
     ide.draw(screen)
-    # draw HUD last so it sits on top of everything
-    _draw_hud(screen, level)
- 
+    # draw HUD last so it sits on top of everything; capture button rect for click handling
+    _center_btn = _draw_hud(screen, level)
+
     pygame.display.flip()
- 
+
     frame_count += 1
     if frame_count % 30 == 0:
         print_grid(level)
- 
+
 _stop_user_thread()
 pygame.quit()
