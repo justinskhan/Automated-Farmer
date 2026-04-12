@@ -242,7 +242,7 @@ def plant(crop_name: str) -> None:
         ide.log("Tile already has a crop.", error=True)
         _wait_for_arrival()
         return
-    if not tile.plant(Crop(crop_type, start_growth=1.0)):
+    if not tile.plant(Crop(crop_type, start_growth=0.0)):
         ide.log("Tile is recovering, wait before replanting.", error=True)
         _wait_for_arrival()
         return

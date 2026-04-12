@@ -1,3 +1,4 @@
+import os
 import pygame
 import math
 from enum import Enum, auto
@@ -20,6 +21,48 @@ _CROP_COLOR = {
 _STEM    = (60, 110, 20)
 _LEAF    = (75, 145, 30)
 _OUTLINE = (0, 0, 0)
+
+# Tomato sprite sheet — plant-only region (soil excluded, drawn separately).
+# (x, y, width, height) within sprites/tomatoGrowth.png
+_TOMATO_FRAMES = [
+    (358, 579,  69,  64),   # SEED
+    (460, 555,  89,  82),   # SPROUT
+    (582, 531, 108, 100),   # GROW
+    (723, 507, 127, 118),   # FLOWER
+    (883, 483, 146, 136),   # HARVEST
+]
+# Dirt strip drawn under every tomato sprite (matches HARVEST sprite width visually)
+_DIRT_H          = 10
+_DIRT_BASE       = (123,  79, 46)
+_DIRT_HIGHLIGHT  = (160,  99, 41)
+
+_tomato_sprites: list | None = None
+
+
+def _load_tomato_sprites() -> list:
+    """Lazy-load and cache the 5 plant-only tomato surfaces with full alpha masking."""
+    global _tomato_sprites
+    if _tomato_sprites is not None:
+        return _tomato_sprites
+    sheet_path = os.path.join(os.path.dirname(__file__), 'sprites', 'tomatoGrowth.png')
+    sheet = pygame.image.load(sheet_path).convert()
+    sprites = []
+    for x, y, w, h in _TOMATO_FRAMES:
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        surf.blit(sheet, (0, 0), (x, y, w, h))
+        #mask out all of the black background
+        #use blue color to filter them out
+        surf.lock()
+        for py in range(h):
+            for px in range(w):
+                col = surf.get_at((px, py))
+                r, g, b = col.r, col.g, col.b
+                if r + g + b < 180 and b >= r and b >= g:
+                    surf.set_at((px, py), (0, 0, 0, 0))
+        surf.unlock()
+        sprites.append(surf)
+    _tomato_sprites = sprites
+    return sprites
 
 
 def _dim(color, g):
@@ -117,34 +160,25 @@ class Crop:
                                      (cx, top), (cx + dx * 4, top - s // 4), 1)
 
         elif self.crop_type == CropType.TOMATO:
-            # wavy stem via 3 segments
-            pts = [(cx, by)]
-            for i in range(1, 4):
-                t = i / 3
-                pts.append((cx + int(math.sin(t * math.pi * 2) * 3),
-                             by - int(stem_h * t)))
-            for i in range(len(pts) - 1):
-                pygame.draw.line(surface, _dim(_STEM, g), pts[i], pts[i + 1],
-                                 max(1, s // 12))
-            # small leaves
-            if g > 0.2:
-                ll = max(3, int(s * 0.35 * g))
-                for i, side in enumerate([1, -1, 1]):
-                    ly = by - int(stem_h * (0.25 + i * 0.25))
-                    pygame.draw.line(surface, _dim(_LEAF, g),
-                                     (cx, ly), (cx + side * ll, ly - ll // 3),
-                                     max(1, s // 13))
-            # fruits — blend green -> red as g rises
-            if g > 0.45:
-                fp      = (g - 0.45) / 0.55
-                fr      = max(2, int(s * 0.28 * fp))
-                blend   = max(0.0, (g - 0.6) / 0.4)
-                fruit_c = _dim((int(80 + blend * 140), int(150 - blend * 110), 20), g)
-                for ox, oy_frac in [(-s // 5, 0.65), (s // 5, 0.72), (0, 0.52)]:
-                    fx = cx + ox
-                    fy = by - int(stem_h * oy_frac)
-                    pygame.draw.circle(surface, fruit_c, (fx, fy), fr)
-                    pygame.draw.circle(surface, _OUTLINE, (fx, fy), fr, 1)
+            # Dirt strip — full tile width
+            pygame.draw.rect(surface, _DIRT_BASE,
+                             (tile_rect.x, tile_rect.bottom - _DIRT_H,
+                              tile_rect.width, _DIRT_H))
+            pygame.draw.rect(surface, _DIRT_HIGHLIGHT,
+                             (tile_rect.x, tile_rect.bottom - _DIRT_H,
+                              tile_rect.width, 3))
+            # Plant sprite above the dirt
+            sprites = _load_tomato_sprites()
+            stage = min(4, int(g * 5))
+            sprite = sprites[stage]
+            sw, sh = sprite.get_size()
+            avail_h = tile_rect.height - _DIRT_H
+            scale = min(tile_rect.width / sw, avail_h / sh)
+            dw = max(1, int(sw * scale))
+            dh = max(1, int(sh * scale))
+            scaled = pygame.transform.scale(sprite, (dw, dh))
+            surface.blit(scaled, (tile_rect.centerx - dw // 2,
+                                  tile_rect.bottom - _DIRT_H - dh))
 
         elif self.crop_type == CropType.CARROT:
             # feathery tops
