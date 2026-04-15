@@ -1,23 +1,29 @@
 import pygame
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from tile import Tile
     from level import Level
 
-#quick mockup for the farmer
-_FARMER_COLOR = (70,  90, 200)
-_FARMER_HEAD  = (240, 190, 140)
-_HAT_COLOR    = (160,  80,  20)
+# Color palette — swap these to restyle the farmer
+_SKIN       = (232, 184, 138)
+_SHIRT      = (200,  90,  42)   # rust/flannel
+_OVERALLS   = ( 59,  95, 138)   # denim blue
+_OVERALLS_D = ( 42,  74, 114)   # darker denim (straps, pocket)
+_HAT_BODY   = (139,  85,  35)   # warm brown
+_HAT_BRIM   = (122,  74,  26)   # slightly darker brim
+_HAT_BAND   = ( 90,  48,  16)   # dark band
+_BOOT       = ( 59,  42,  26)   # dark leather
+_EYE        = ( 59,  42,  26)
+_MOUTH      = (160, 115,  90)
 
-#can be adjusted for farmer speed
+# can be adjusted for farmer speed
 _MOVE_COOLDOWN = 0.18
 
+# for now moves with WASD keys and only will move once previous move is made
 class Farmer:
-
     SPEED = 300  # pixels per second for smooth glide
 
-    #initializing the farmer
+    # initializing the farmer
     def __init__(self, start_tile: "Tile", tile_size: int):
         self.current_tile = start_tile
         self.tile_size = tile_size
@@ -27,13 +33,42 @@ class Farmer:
         ]
         self._target_pos: list[float] = list(self.pixel_pos)
         self._move_cooldown: float = 0.0
-        self._arrived: bool = True 
+        self._arrived: bool = True
 
-    #updating the farmer position
-    def update(self, dt: float) -> None:
+    # function to handle input
+    def handle_input(self, level: "Level") -> None:
+        if self._move_cooldown > 0 or not self._arrived:
+            return
+        keys = pygame.key.get_pressed()
+        dr, dc = 0, 0
+        if keys[pygame.K_w]:
+            dr = -1
+        elif keys[pygame.K_s]:
+            dr = 1
+        elif keys[pygame.K_a]:
+            dc = -1
+        elif keys[pygame.K_d]:
+            dc = 1
+        else:
+            return
+        pos = level.find_tile(self.current_tile)
+        if pos is None:
+            return
+        r, c = pos
+        target = level.get_tile(r + dr, c + dc)
+        if target and target.walkable:
+            self.current_tile = target
+            self._target_pos = [
+                float(target.rect.centerx),
+                float(target.rect.centery),
+            ]
+            self._move_cooldown = _MOVE_COOLDOWN
+            self._arrived = False  # the farmer is moving
+
+    # updating the farmer position
+    def update(self, dt: float, level: "Level") -> None:
         self._move_cooldown = max(0.0, self._move_cooldown - dt)
-
-        #movement animation for the farmer (will be changed)
+        # movement animation for the farmer (will be changed)
         arrived_x = arrived_y = False
         for i, arrived in enumerate([False, False]):
             diff = self._target_pos[i] - self.pixel_pos[i]
@@ -46,8 +81,10 @@ class Farmer:
                     arrived_y = True
             else:
                 self.pixel_pos[i] += step if diff > 0 else -step
-
         self._arrived = arrived_x and arrived_y
+        # makes it so each input waits for previous to finish
+        if self._arrived:
+            self.handle_input(level)
 
     def snap_to_tile(self) -> None:
         self.pixel_pos = [
@@ -57,27 +94,90 @@ class Farmer:
         self._target_pos = list(self.pixel_pos)
         self._arrived = True
 
-    #drawing the farmer to the screen
+    # drawing the farmer to the screen
     def draw(self, surface: pygame.Surface) -> None:
         cx = int(self.pixel_pos[0])
         cy = int(self.pixel_pos[1])
         ts = self.tile_size
 
-        bw = ts // 3
-        bh = ts // 3
-        body = pygame.Rect(cx - bw // 2, cy - bh // 4, bw, bh)
-        pygame.draw.rect(surface, _FARMER_COLOR, body, border_radius=4)
+        # Scale factor — everything derived from tile size (designed at 64px)
+        s = ts / 64
 
-        hr = ts // 7
-        hcy = body.top - hr
-        pygame.draw.circle(surface, _FARMER_HEAD, (cx, hcy), hr)
+        def r(v: float) -> int:
+            return max(1, int(v * s))
 
-        hw = hr * 2 + 6
-        hh = hr
-        hat = pygame.Rect(cx - hw // 2, hcy - hr - hh + 4, hw, hh)
-        pygame.draw.rect(surface, _HAT_COLOR, hat, border_radius=2)
-        brim = pygame.Rect(cx - hw // 2 - 4, hcy - hr + 2, hw + 8, 5)
-        pygame.draw.rect(surface, _HAT_COLOR, brim)
+        def rx(offset: float) -> int:
+            return cx + int(offset * s)
+
+        def ry(offset: float) -> int:
+            return cy + int(offset * s)
+
+        # ── Boots ──────────────────────────────────────────────
+        boot_w, boot_h = r(12), r(8)
+        pygame.draw.rect(surface, _BOOT,
+            (rx(-13), ry(14), boot_w, boot_h), border_radius=r(2))
+        pygame.draw.rect(surface, _BOOT,
+            (rx(1),   ry(14), boot_w, boot_h), border_radius=r(2))
+
+        # ── Legs (overalls) ────────────────────────────────────
+        leg_w, leg_h = r(10), r(18)
+        pygame.draw.rect(surface, _OVERALLS,
+            (rx(-12), ry(-2), leg_w, leg_h), border_radius=r(2))
+        pygame.draw.rect(surface, _OVERALLS,
+            (rx(2),   ry(-2), leg_w, leg_h), border_radius=r(2))
+
+        # ── Arms / shirt ───────────────────────────────────────
+        arm_w, arm_h = r(8), r(14)
+        pygame.draw.rect(surface, _SHIRT,
+            (rx(-20), ry(-6), arm_w, arm_h), border_radius=r(3))
+        pygame.draw.rect(surface, _SHIRT,
+            (rx(12),  ry(-6), arm_w, arm_h), border_radius=r(3))
+
+        # ── Body / overalls bib ────────────────────────────────
+        body_w, body_h = r(24), r(20)
+        pygame.draw.rect(surface, _OVERALLS,
+            (rx(-12), ry(-8), body_w, body_h), border_radius=r(3))
+
+        # Straps
+        strap_w = r(5)
+        pygame.draw.rect(surface, _OVERALLS_D,
+            (rx(-7), ry(-8), strap_w, r(8)), border_radius=r(2))
+        pygame.draw.rect(surface, _OVERALLS_D,
+            (rx(2),  ry(-8), strap_w, r(8)), border_radius=r(2))
+
+        # Bib pocket
+        pygame.draw.rect(surface, _OVERALLS_D,
+            (rx(-4), ry(-4), r(8), r(6)), border_radius=r(1))
+
+        # ── Head ───────────────────────────────────────────────
+        head_r = r(11)
+        head_cy = ry(-20)
+        pygame.draw.circle(surface, _SKIN, (cx, head_cy), head_r)
+
+        # Eyes
+        eye_r = r(1.5)
+        pygame.draw.circle(surface, _EYE, (rx(-4), head_cy - r(2)), eye_r)
+        pygame.draw.circle(surface, _EYE, (rx(4),  head_cy - r(2)), eye_r)
+
+        # Smile (arc)
+        smile_rect = pygame.Rect(rx(-4), head_cy + r(3), r(8), r(3))
+        pygame.draw.arc(surface, _MOUTH, smile_rect, 3.5, 6.0, max(1, r(1.5)))
+
+        # ── Hat brim ───────────────────────────────────────────
+        brim_w, brim_h = r(36), r(5)
+        pygame.draw.rect(surface, _HAT_BRIM,
+            (cx - brim_w // 2, head_cy - head_r - r(2), brim_w, brim_h),
+            border_radius=r(2))
+
+        # Hat body
+        hat_w, hat_h = r(26), r(16)
+        hat_top = head_cy - head_r - r(2) - hat_h
+        pygame.draw.rect(surface, _HAT_BODY,
+            (cx - hat_w // 2, hat_top, hat_w, hat_h), border_radius=r(3))
+
+        # Hat band
+        pygame.draw.rect(surface, _HAT_BAND,
+            (cx - hat_w // 2, hat_top + hat_h - r(5), hat_w, r(4)))
 
     def __repr__(self) -> str:
         return f"Farmer(tile={self.current_tile})"
