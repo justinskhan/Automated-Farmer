@@ -10,44 +10,205 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
-
+ 
 pygame.init()
 pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
 pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
-
+ 
 # allow Ctrl+C in the terminal to quit the game cleanly
 signal.signal(signal.SIGINT, lambda s, f: pygame.event.post(pygame.event.Event(pygame.QUIT)))
-
+ 
 manager = LevelManager()
 manager.current.center_on(*screen.get_size())
-
+ 
 level   = manager.current
 farmer  = Farmer(level.start_tile, level.TILE_SIZE)
 farmer.snap_to_tile()
-
+ 
 background = Background(color=(173, 216, 230))
 ide        = IDE(20, 20)
 overlay    = Overlay()
-
+ 
 # game states
 STATE_START   = "start"
 STATE_PLAYING = "playing"
 game_state    = STATE_START
-
+ 
 # start screen animation state
 _btn_hovered      = False
 _pulse_timer      = 0.0
 _current_btn_rect = None
+ 
+# in-game how to play modal state — tracks visibility, scroll offset, and the close button rect
+_show_htp_ingame   = False
+_htp_ingame_close: pygame.Rect | None = None
+_htp_scroll_offset = 0   # pixels scrolled down into the content
 
 
-def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
+def _htp_scroll(delta: int) -> None:
+    """Adjust the how-to-play scroll offset by delta pixels (positive = scroll down)."""
+    global _htp_scroll_offset
+    _htp_scroll_offset = max(0, _htp_scroll_offset + delta)
+
+
+def _draw_htp_modal_ingame(surface: pygame.Surface) -> pygame.Rect:
+    """Draw the in-game How to Play modal with a scrollable content area.
+    Returns the X close button rect."""
+    global _htp_scroll_offset
+
     sw, sh = surface.get_size()
 
+    # dark semi-transparent backdrop covering the whole screen
+    backdrop = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    backdrop.fill((0, 0, 0, 170))
+    surface.blit(backdrop, (0, 0))
+
+    # modal dimensions — height is capped so it always fits the window
+    mw = 540
+    mh = min(520, sh - 40)
+    mx = (sw - mw) // 2
+    my = (sh - mh) // 2
+
+    # fixed header zone: title + divider
+    HEADER_H   = 50
+    SCROLLBAR_W = 10
+    CONTENT_X   = mx + 16
+    CONTENT_W   = mw - 32 - SCROLLBAR_W  # leave room for scrollbar on the right
+
+    # ── build the full content surface (may be taller than the modal) ──────────
+    font_h    = pygame.font.SysFont("Consolas", 14, bold=True)
+    font_b    = pygame.font.SysFont("Consolas", 13)
+    font_code = pygame.font.SysFont("Consolas", 13)
+
+    sections = [
+        ("GOAL",     "Harvest the required number of crops before time runs out."),
+        ("COMMANDS", None),
+        (None, "move(\"up\")      move(\"down\")"),
+        (None, "move(\"left\")    move(\"right\")"),
+        (None, "plant(\"wheat\")  plant(\"corn\")"),
+        (None, "plant(\"tomato\") plant(\"carrot\")"),
+        (None, "harvest()"),
+        ("TIPS",     "Crops must be fully grown before you can harvest them."),
+        (None,       "You can only plant on empty, walkable tiles."),
+        (None,       "Some commands unlock as you progress through levels."),
+        ("CONTROLS", "Click the Run button to play."),
+    ]
+
+    # measure total content height first so we can clamp scroll
+    content_h = 8  # top padding
+    for header, body in sections:
+        if header:
+            content_h += 20
+        if body:
+            content_h += 18
+    content_h += 8  # bottom padding
+
+    viewport_h = mh - HEADER_H  # scrollable area height inside the modal
+
+    # clamp scroll so we never scroll past the end
+    max_scroll = max(0, content_h - viewport_h)
+    _htp_scroll_offset = min(_htp_scroll_offset, max_scroll)
+
+    # render content onto an off-screen surface
+    content_surf = pygame.Surface((CONTENT_W, content_h), pygame.SRCALPHA)
+    content_surf.fill((0, 0, 0, 0))
+
+    cy = 8
+    for header, body in sections:
+        if header:
+            col  = (120, 200, 100) if header != "COMMANDS" else (200, 180, 80)
+            surf = font_h.render(header, True, col)
+            content_surf.blit(surf, (0, cy))
+            cy += 20
+        if body:
+            is_code  = body.startswith(("move(", "plant(", "harvest("))
+            color    = (180, 220, 255) if is_code else (190, 210, 185)
+            font_use = font_code if is_code else font_b
+            indent   = 8 if is_code else 0
+            surf = font_use.render(body, True, color)
+            content_surf.blit(surf, (indent, cy))
+            cy += 18
+
+    # ── draw the modal panel ───────────────────────────────────────────────────
+    panel = pygame.Surface((mw, mh), pygame.SRCALPHA)
+    panel.fill((20, 28, 18, 245))
+    surface.blit(panel, (mx, my))
+
+    # green border
+    pygame.draw.rect(surface, (60, 140, 60), pygame.Rect(mx, my, mw, mh), 2, border_radius=6)
+
+    # title
+    font_title = pygame.font.SysFont("Consolas", 20, bold=True)
+    title_surf = font_title.render("How to Play", True, (160, 230, 120))
+    surface.blit(title_surf, (mx + 16, my + 14))
+
+    # divider below title
+    pygame.draw.line(surface, (60, 120, 60),
+                     (mx + 8,      my + HEADER_H - 4),
+                     (mx + mw - 8, my + HEADER_H - 4), 1)
+
+    # ── blit the visible slice of the content surface ──────────────────────────
+    clip_rect  = pygame.Rect(0, _htp_scroll_offset, CONTENT_W, viewport_h)
+    dest_x     = CONTENT_X
+    dest_y     = my + HEADER_H
+
+    # clip so content never bleeds outside the modal
+    old_clip = surface.get_clip()
+    surface.set_clip(pygame.Rect(mx, my + HEADER_H, mw, viewport_h))
+    surface.blit(content_surf, (dest_x, dest_y), clip_rect)
+    surface.set_clip(old_clip)
+
+    # subtle fade at the bottom edge to hint there is more content
+    if _htp_scroll_offset < max_scroll:
+        fade_h   = 28
+        fade_surf = pygame.Surface((mw - 4, fade_h), pygame.SRCALPHA)
+        for i in range(fade_h):
+            alpha = int(200 * i / fade_h)
+            pygame.draw.line(fade_surf, (20, 28, 18, alpha), (0, fade_h - 1 - i), (mw - 4, fade_h - 1 - i))
+        surface.blit(fade_surf, (mx + 2, my + mh - fade_h - 2))
+
+    # ── scrollbar ─────────────────────────────────────────────────────────────
+    if max_scroll > 0:
+        sb_x      = mx + mw - SCROLLBAR_W - 4
+        sb_y      = my + HEADER_H + 2
+        sb_h      = viewport_h - 4
+        # thumb height proportional to how much of the content is visible
+        thumb_h   = max(20, int(sb_h * viewport_h / content_h))
+        thumb_top = sb_y + int((sb_h - thumb_h) * _htp_scroll_offset / max_scroll)
+
+        # track
+        pygame.draw.rect(surface, (40, 50, 40), pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h), border_radius=4)
+        # thumb
+        pygame.draw.rect(surface, (90, 160, 80), pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h), border_radius=4)
+
+    # ── X close button ─────────────────────────────────────────────────────────
+    close_size = 28
+    cx_btn     = mx + mw - close_size - 6
+    cy_btn     = my + 6
+    close_rect    = pygame.Rect(cx_btn, cy_btn, close_size, close_size)
+    close_hovered = close_rect.collidepoint(pygame.mouse.get_pos())
+
+    close_col = (200, 60, 60) if close_hovered else (140, 40, 40)
+    pygame.draw.rect(surface, close_col, close_rect, border_radius=4)
+    pygame.draw.rect(surface, (220, 80, 80), close_rect, 1, border_radius=4)
+
+    pad = 8
+    lx1, ly1 = cx_btn + pad, cy_btn + pad
+    lx2, ly2 = cx_btn + close_size - pad, cy_btn + close_size - pad
+    pygame.draw.line(surface, (255, 255, 255), (lx1, ly1), (lx2, ly2), 2)
+    pygame.draw.line(surface, (255, 255, 255), (lx2, ly1), (lx1, ly2), 2)
+
+    return close_rect
+ 
+ 
+def _draw_start_screen(surface: pygame.Surface, pulse: float) -> pygame.Rect:
+    sw, sh = surface.get_size()
+ 
     # sky-blue background matching the game background color
     surface.fill((173, 216, 230))
-
+ 
     # decorative dark panel behind the title area
     panel_w = 520
     panel_h = 280
@@ -56,19 +217,19 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 210))
     surface.blit(panel_surf, (panel_x, panel_y))
-
+ 
     # subtitle tag line above the main title
     font_sub = pygame.font.SysFont("Consolas", 15)
     sub_surf = font_sub.render("< Learn to code through farming />", True, (100, 180, 100))
     surface.blit(sub_surf, (sw // 2 - sub_surf.get_width() // 2, panel_y + 28))
-
+ 
     # main title — large bold text
-    font_title = pygame.font.SysFont("Consolas", 52, bold=True)
-    title_surf = font_title.render("Automated", True, (220, 240, 200))
-    title2_surf = font_title.render("Farmer", True, (160, 210, 120))
+    font_title  = pygame.font.SysFont("Consolas", 52, bold=True)
+    title_surf  = font_title.render("Automated", True, (220, 240, 200))
+    title2_surf = font_title.render("Farmer",    True, (160, 210, 120))
     surface.blit(title_surf,  (sw // 2 - title_surf.get_width()  // 2, panel_y + 60))
     surface.blit(title2_surf, (sw // 2 - title2_surf.get_width() // 2, panel_y + 118))
-
+ 
     # small decorative crop icons drawn as simple shapes below the title
     icons = [
         ((sw // 2 - 90, panel_y + 195), (210, 180, 50),  "sq"),   # wheat square
@@ -87,28 +248,28 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> None:
             pts = [(ix, iy - 11), (ix - 10, iy + 9), (ix + 10, iy + 9)]
             pygame.draw.polygon(surface, col, pts)
             pygame.draw.polygon(surface, (0, 0, 0), pts, 1)
-
+ 
     # play button — pulses slightly in size using the pulse timer
     btn_w  = int(160 + pulse * 6)
     btn_h  = int(48  + pulse * 3)
     btn_x  = sw // 2 - btn_w // 2
     btn_y  = panel_y + panel_h + 30
     btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-
+ 
     # brighter green when hovered
     btn_color = (70, 210, 100) if _btn_hovered else (50, 180, 80)
     pygame.draw.rect(surface, btn_color, btn_rect, border_radius=6)
     pygame.draw.rect(surface, (30, 100, 50), btn_rect, 2, border_radius=6)
-
+ 
     # play text inside the button
     font_btn = pygame.font.SysFont("Consolas", 20, bold=True)
     btn_label = font_btn.render("PLAY", True, (255, 255, 255))
     surface.blit(btn_label, (sw // 2 - btn_label.get_width() // 2,
                               btn_y + btn_h // 2 - btn_label.get_height() // 2))
-
+ 
     return btn_rect
-
-
+ 
+ 
 # three threading events coordinate the user thread and the game loop
 # _step_event is set by the game loop to tell the user thread the farmer arrived
 # _done_event is set by the user thread to tell the game loop a command was issued
@@ -117,8 +278,8 @@ _step_event = threading.Event()
 _done_event = threading.Event()
 _stop_event = threading.Event()
 _user_thread: threading.Thread | None = None
-
-
+ 
+ 
 def _stop_user_thread() -> None:
     global _user_thread
     if _user_thread and _user_thread.is_alive():
@@ -130,8 +291,8 @@ def _stop_user_thread() -> None:
     _stop_event.clear()
     _step_event.clear()
     _done_event.clear()
-
-
+ 
+ 
 def _wait_for_arrival() -> None:
     # cancellation check before blocking so a stopped thread exits immediately
     if _stop_event.is_set():
@@ -142,13 +303,13 @@ def _wait_for_arrival() -> None:
     # check again after waking up in case stop was requested while waiting
     if _stop_event.is_set():
         raise SystemExit
-
-
+ 
+ 
 def _launch_user_code(code: str) -> None:
     global _user_thread
     # stop any previously running thread before starting a new one
     _stop_user_thread()
-
+ 
     try:
         compiled = compile(code, "<ide>", "exec")
     except SyntaxError as e:
@@ -157,7 +318,7 @@ def _launch_user_code(code: str) -> None:
     except Exception as e:
         ide.log(f"Error: {e}", error=True)
         return
-
+ 
     def _run() -> None:
         try:
             exec(compiled, {"move": move, "plant": plant, "harvest": harvest})
@@ -165,13 +326,13 @@ def _launch_user_code(code: str) -> None:
             pass  # clean stop requested by the game, not a real error
         except Exception as e:
             ide.log(f"Error: {e}", error=True)
-
+ 
     _step_event.clear()
     _done_event.clear()
     _user_thread = threading.Thread(target=_run, daemon=True)
     _user_thread.start()
-
-
+ 
+ 
 def _reload_level() -> None:
     global level, farmer
     _stop_user_thread()
@@ -184,8 +345,8 @@ def _reload_level() -> None:
     ide.cursor_row = 0
     ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
-
-
+ 
+ 
 def _advance_level() -> None:
     global level, farmer
     _stop_user_thread()
@@ -199,8 +360,8 @@ def _advance_level() -> None:
     ide.cursor_row = 0
     ide.cursor_col = 0
     ide.update_allowed(level.objective.allowed_commands)
-
-
+ 
+ 
 def move(direction: str) -> None:
     pos = level.find_tile(farmer.current_tile)
     if pos is None:
@@ -219,8 +380,8 @@ def move(direction: str) -> None:
         farmer._target_pos  = [float(target.rect.centerx), float(target.rect.centery)]
         farmer._arrived     = False
     _wait_for_arrival()
-
-
+ 
+ 
 def plant(crop_name: str) -> None:
     if "plant" not in level.objective.allowed_commands:
         ide.log("plant() is locked on this level.", error=True)
@@ -248,8 +409,8 @@ def plant(crop_name: str) -> None:
         return
     ide.log(f"Planted: {crop_name}")
     _wait_for_arrival()
-
-
+ 
+ 
 def harvest() -> None:
     tile = farmer.current_tile
     if tile.crop is None:
@@ -264,12 +425,12 @@ def harvest() -> None:
     tile.remove_crop()
     level.objective.record_harvest()
     _wait_for_arrival()
-
-
+ 
+ 
 def _while_loops_allowed() -> bool:
     return "while" in level.objective.allowed_commands
-
-
+ 
+ 
 def _check_forbidden_constructs(tree: ast.AST) -> str | None:
     for node in ast.walk(tree):
         if isinstance(node, ast.While) and not _while_loops_allowed():
@@ -279,52 +440,53 @@ def _check_forbidden_constructs(tree: ast.AST) -> str | None:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             return "import statements are not allowed."
     return None
-
-
-def _draw_hud(surface: pygame.Surface, lv) -> pygame.Rect:
+ 
+ 
+def _draw_hud(surface: pygame.Surface, lv) -> tuple:
+    """Draw the in-game HUD. Returns (center_btn_rect, htp_btn_rect)."""
     obj        = lv.objective
     font_title = pygame.font.SysFont("Consolas", 16, bold=True)
     font_body  = pygame.font.SysFont("Consolas", 14)
     font_time  = pygame.font.SysFont("Consolas", 22, bold=True)
     font_label = pygame.font.SysFont("Consolas", 11)
-
+ 
     padding = 10
     line_h  = 20
     margin  = 12
-
+ 
     obj_lines = [f"Level {lv.number}: {lv.name}", f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
-
+ 
     # measure widest line so the panel always fits regardless of level name length
     panel_w = max(font_title.size(obj_lines[0])[0],
                   font_body.size(obj_lines[1])[0]) + padding * 2
     panel_h = padding * 2 + len(obj_lines) * line_h
-
+ 
     sx = surface.get_width() - panel_w - margin
     sy = margin
-
+ 
     # semi-transparent dark background
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 190))
     surface.blit(panel_surf, (sx, sy))
-
+ 
     # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
-
+ 
     # level name in bright white-blue
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
-
+ 
     # harvest progress in green
     surface.blit(font_body.render(obj_lines[1], True, (180, 220, 180)),
                  (sx + padding, sy + padding + line_h))
-
+ 
     # time box sits directly below the objective panel, same width so they align
     time_box_w = panel_w
     time_box_h = 54
     tx = sx
     ty = sy + panel_h + 6
-
+ 
     # pick time string and color based on whether a timer exists
     t = obj.time_remaining
     if t is None:
@@ -338,67 +500,94 @@ def _draw_hud(surface: pygame.Surface, lv) -> pygame.Rect:
             time_col = (230, 180, 50)
         else:
             time_col = (180, 220, 180)
-
+ 
     # semi-transparent background for time box
     time_surf = pygame.Surface((time_box_w, time_box_h), pygame.SRCALPHA)
     time_surf.fill((15, 15, 25, 190))
     surface.blit(time_surf, (tx, ty))
-
+ 
     # border matching IDE style
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(tx, ty, time_box_w, time_box_h), 1, border_radius=4)
-
+ 
     # small label at the top of the time box
     label_surf = font_label.render("TIME LEFT", True, (120, 120, 160))
     surface.blit(label_surf, (tx + padding, ty + 6))
-
+ 
     # large time number centered in the box
     time_render = font_time.render(time_str, True, time_col)
     time_x = tx + (time_box_w - time_render.get_width()) // 2
     time_y = ty + time_box_h - time_render.get_height() - 6
     surface.blit(time_render, (time_x, time_y))
-
+ 
     # Center IDE button sits directly below the time box, same width and style
     btn_w = time_box_w
     btn_h = time_box_h
     bx    = tx
     by    = ty + time_box_h + 6
-
+ 
     center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
     btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())
-
+ 
     # background — slightly brighter on hover to signal it is clickable
     btn_bg_col = (30, 30, 45, 210) if btn_hovered else (15, 15, 25, 190)
     btn_bg = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
     btn_bg.fill(btn_bg_col)
     surface.blit(btn_bg, (bx, by))
-
+ 
     # border matching the rest of the HUD panels
     pygame.draw.rect(surface, (80, 80, 110), center_btn_rect, 1, border_radius=4)
-
+ 
     # white label centered in the box
     font_btn = pygame.font.SysFont("Consolas", 14, bold=True)
     lbl = font_btn.render("Center IDE", True, (255, 255, 255))
     surface.blit(lbl, (bx + (btn_w - lbl.get_width()) // 2,
                         by + (btn_h - lbl.get_height()) // 2))
+ 
+    # How to Play button sits directly below the Center IDE button
+    htp_w = btn_w
+    htp_h = btn_h
+    hx    = bx
+    hy    = by + btn_h + 6
+ 
+    htp_btn_rect = pygame.Rect(hx, hy, htp_w, htp_h)
+    htp_hovered  = htp_btn_rect.collidepoint(pygame.mouse.get_pos())
 
-    return center_btn_rect
+    # simple dark background matching the other HUD panels, brighter on hover
+    htp_bg_col = (30, 30, 45, 210) if htp_hovered else (15, 15, 25, 190)
+    htp_bg = pygame.Surface((htp_w, htp_h), pygame.SRCALPHA)
+    htp_bg.fill(htp_bg_col)
+    surface.blit(htp_bg, (hx, hy))
 
+    # border matching the rest of the HUD panels
+    pygame.draw.rect(surface, (80, 80, 110), htp_btn_rect, 1, border_radius=4)
 
+    # plain text label centered in the button, no icon
+    font_htp = pygame.font.SysFont("Consolas", 14, bold=True)
+    htp_lbl  = font_htp.render("How to Play", True, (255, 255, 255))
+    surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
+                             hy + (htp_h - htp_lbl.get_height()) // 2))
+ 
+    return center_btn_rect, htp_btn_rect
+ 
+ 
 ide.update_allowed(level.objective.allowed_commands)
-
+ 
 frame_count = 0
 running     = True
 frozen      = False
+ 
+# both HUD button rects are tracked so each can be hit-tested independently
 _center_btn: pygame.Rect | None = None
-
+_htp_btn:    pygame.Rect | None = None
+ 
 while running:
     dt = clock.tick(60) / 1000.0
-
+ 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
+ 
         elif event.type == pygame.VIDEORESIZE:
             old_w, old_h = screen.get_size()
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
@@ -412,7 +601,7 @@ while running:
                 ide.rect.height = max(120, int(ide.rect.height * sy))
                 level.center_on(event.w, event.h)
                 farmer.snap_to_tile()
-
+ 
         # handle start screen clicks
         if game_state == STATE_START:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -420,7 +609,7 @@ while running:
                     game_state = STATE_PLAYING
                     level.center_on(*screen.get_size())
             continue
-
+ 
         # overlay swallows all input while frozen
         if frozen:
             if overlay.handle_event(event):
@@ -432,16 +621,39 @@ while running:
                 frozen = False
             # don't pass events to IDE or farmer while frozen
             continue
-
-        # Center IDE button — reset IDE to its original position and size
-        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                and _center_btn and _center_btn.collidepoint(event.pos)):
-            ide.rect.x      = 20
-            ide.rect.y      = 20
-            ide.rect.width  = IDE.WIDTH
-            ide.rect.height = IDE.HEIGHT
+ 
+        # mouse wheel scrolls the how to play modal when it is open
+        if event.type == pygame.MOUSEWHEEL and _show_htp_ingame:
+            _htp_scroll(-event.y * 24)
             continue
 
+        # Escape or X key dismisses the in-game how to play modal from the keyboard
+        if event.type == pygame.KEYDOWN:
+            if _show_htp_ingame and event.key in (pygame.K_ESCAPE, pygame.K_x):
+                _show_htp_ingame = False
+                continue
+ 
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # close the modal when its X button is clicked; swallow all other clicks while open
+            if _show_htp_ingame:
+                if _htp_ingame_close and _htp_ingame_close.collidepoint(event.pos):
+                    _show_htp_ingame = False
+                continue
+ 
+            # Center IDE button — reset IDE to its original position and size
+            if _center_btn and _center_btn.collidepoint(event.pos):
+                ide.rect.x      = 20
+                ide.rect.y      = 20
+                ide.rect.width  = IDE.WIDTH
+                ide.rect.height = IDE.HEIGHT
+                continue
+ 
+            # How to Play button — open the in-game modal
+            if _htp_btn and _htp_btn.collidepoint(event.pos):
+                _show_htp_ingame = True
+                _htp_scroll_offset = 0
+                continue
+ 
         # pass events to the IDE, run code if the run button was pressed
         code = ide.handle_event(event)
         if code is not None:
@@ -458,7 +670,7 @@ while running:
                 ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
             except Exception as e:
                 ide.log(f"Error: {e}", error=True)
-
+ 
     # draw and update the start screen
     if game_state == STATE_START:
         import math
@@ -469,17 +681,17 @@ while running:
         _btn_hovered = _current_btn_rect.collidepoint(mouse_pos)
         pygame.display.flip()
         continue
-
+ 
     # keep a reference to the button rect for hit testing
     _current_btn_rect = None
-
+ 
     if frozen:
         # still draw everything behind the overlay while frozen
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _center_btn = _draw_hud(screen, level)
+        _center_btn, _htp_btn = _draw_hud(screen, level)
         obj = level.objective
         overlay.draw(
             screen,
@@ -492,16 +704,16 @@ while running:
         )
         pygame.display.flip()
         continue
-
+ 
     obj = level.objective
     if obj.status == ObjectiveStatus.PLAYING:
         obj.update(dt)
-
+ 
     # freeze the game as soon as the level ends
     if obj.status != ObjectiveStatus.PLAYING and not frozen:
         frozen = True
         _stop_user_thread()
-
+ 
     # once the farmer has arrived, signal the user thread to issue its next command
     if (
         not frozen
@@ -512,23 +724,29 @@ while running:
     ):
         _done_event.clear()
         _step_event.set()
-
-    farmer.update(dt)
+ 
+    farmer.update(dt, level)
     ide.update(dt)
     level.update(dt, pygame.mouse.get_pos())
-
+ 
     background.draw(screen)
     level.draw(screen)
     farmer.draw(screen)
     ide.draw(screen)
-    # draw HUD last so it sits on top of everything; capture button rect for click handling
-    _center_btn = _draw_hud(screen, level)
-
+    # draw HUD last so it sits on top of everything; capture both button rects for click handling
+    _center_btn, _htp_btn = _draw_hud(screen, level)
+ 
+    # draw the how to play modal on top of everything if it is open; capture close button rect
+    if _show_htp_ingame:
+        _htp_ingame_close = _draw_htp_modal_ingame(screen)
+    else:
+        _htp_ingame_close = None
+ 
     pygame.display.flip()
-
+ 
     frame_count += 1
     if frame_count % 30 == 0:
         print_grid(level)
-
+ 
 _stop_user_thread()
 pygame.quit()
