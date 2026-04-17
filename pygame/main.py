@@ -53,6 +53,66 @@ def _htp_scroll(delta: int) -> None:
     _htp_scroll_offset = max(0, _htp_scroll_offset + delta)
 
 
+def _build_htp_content(allowed: list[str]) -> list[tuple]:
+    """Return a flat list of (kind, text, indent) rows for the modal.
+
+    kind values:
+      'section'  — top-level header (e.g. GOAL, COMMANDS, TIPS, CONTROLS)
+      'sub'      — subsection label inside COMMANDS (e.g. Movement)
+      'code'     — a command line, indented under its subsection
+      'body'     — plain descriptive text
+      'locked'   — greyed-out locked command hint
+    """
+    rows: list[tuple] = []
+
+    # ── GOAL ──────────────────────────────────────────────────────────────────
+    rows.append(("section", "GOAL", 0))
+    rows.append(("body", "Harvest the required crops before time runs out.", 0))
+
+    # ── COMMANDS ──────────────────────────────────────────────────────────────
+    rows.append(("section", "COMMANDS", 0))
+
+    # Movement subsection — always shown, move is always unlocked
+    rows.append(("sub", "Movement", 0))
+    rows.append(("code", 'move("up")      move("down")', 16))
+    rows.append(("code", 'move("left")    move("right")', 16))
+
+    # Planting subsection
+    rows.append(("sub", "Planting", 0))
+    if "plant" in allowed:
+        rows.append(("code", 'plant("wheat")  plant("corn")', 16))
+        rows.append(("code", 'plant("tomato") plant("carrot")', 16))
+    else:
+        rows.append(("locked", "plant()  [locked]", 16))
+
+    # Harvesting subsection
+    rows.append(("sub", "Harvesting", 0))
+    if "harvest" in allowed:
+        rows.append(("code", "harvest()", 16))
+    else:
+        rows.append(("locked", "harvest()  [locked]", 16))
+
+    # Loops subsection — show unlock hint when not yet available
+    rows.append(("sub", "Loops", 0))
+    if "while" in allowed:
+        rows.append(("code", "while <condition>:", 16))
+        rows.append(("body", "Repeat actions automatically.", 20))
+    else:
+        rows.append(("locked", "while loops  [unlocks at level 5]", 16))
+
+    # ── TIPS ──────────────────────────────────────────────────────────────────
+    rows.append(("section", "TIPS", 0))
+    rows.append(("body", "Crops must be fully grown before harvesting.", 0))
+    rows.append(("body", "You can only plant on empty, walkable tiles.", 0))
+    rows.append(("body", "New commands unlock as you progress.", 0))
+
+    # ── CONTROLS ──────────────────────────────────────────────────────────────
+    rows.append(("section", "CONTROLS", 0))
+    rows.append(("body", "Click the Run button to play.", 0))
+
+    return rows
+
+
 def _draw_htp_modal_ingame(surface: pygame.Surface) -> pygame.Rect:
     """Draw the in-game How to Play modal with a scrollable content area.
     Returns the X close button rect."""
@@ -66,48 +126,43 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> pygame.Rect:
     surface.blit(backdrop, (0, 0))
 
     # modal dimensions — height is capped so it always fits the window
-    mw = 540
+    mw = 560
     mh = min(520, sh - 40)
     mx = (sw - mw) // 2
     my = (sh - mh) // 2
 
     # fixed header zone: title + divider
-    HEADER_H   = 50
+    HEADER_H    = 50
     SCROLLBAR_W = 10
     CONTENT_X   = mx + 16
-    CONTENT_W   = mw - 32 - SCROLLBAR_W  # leave room for scrollbar on the right
+    CONTENT_W   = mw - 32 - SCROLLBAR_W
 
-    # ── build the full content surface (may be taller than the modal) ──────────
-    font_h    = pygame.font.SysFont("Consolas", 14, bold=True)
-    font_b    = pygame.font.SysFont("Consolas", 13)
-    font_code = pygame.font.SysFont("Consolas", 13)
+    # fonts
+    font_section = pygame.font.SysFont("Consolas", 14, bold=True)
+    font_sub     = pygame.font.SysFont("Consolas", 13, bold=True)
+    font_code    = pygame.font.SysFont("Consolas", 13)
+    font_body    = pygame.font.SysFont("Consolas", 13)
+    font_locked  = pygame.font.SysFont("Consolas", 13)
 
-    sections = [
-        ("GOAL",     "Harvest the required number of crops before time runs out."),
-        ("COMMANDS", None),
-        (None, "move(\"up\")      move(\"down\")"),
-        (None, "move(\"left\")    move(\"right\")"),
-        (None, "plant(\"wheat\")  plant(\"corn\")"),
-        (None, "plant(\"tomato\") plant(\"carrot\")"),
-        (None, "harvest()"),
-        ("TIPS",     "Crops must be fully grown before you can harvest them."),
-        (None,       "You can only plant on empty, walkable tiles."),
-        (None,       "Some commands unlock as you progress through levels."),
-        ("CONTROLS", "Click the Run button to play."),
-    ]
+    # row heights per kind
+    ROW_H = {
+        "section": 26,   # section header gets a bit more breathing room above
+        "sub":     22,
+        "code":    18,
+        "body":    18,
+        "locked":  18,
+    }
 
-    # measure total content height first so we can clamp scroll
-    content_h = 8  # top padding
-    for header, body in sections:
-        if header:
-            content_h += 20
-        if body:
-            content_h += 18
-    content_h += 8  # bottom padding
+    # build content rows from current level's allowed commands
+    rows = _build_htp_content(level.objective.allowed_commands)
 
-    viewport_h = mh - HEADER_H  # scrollable area height inside the modal
+    # measure total content height
+    content_h = 8
+    for kind, _, _ in rows:
+        content_h += ROW_H[kind]
+    content_h += 8
 
-    # clamp scroll so we never scroll past the end
+    viewport_h = mh - HEADER_H
     max_scroll = max(0, content_h - viewport_h)
     _htp_scroll_offset = min(_htp_scroll_offset, max_scroll)
 
@@ -116,20 +171,44 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> pygame.Rect:
     content_surf.fill((0, 0, 0, 0))
 
     cy = 8
-    for header, body in sections:
-        if header:
-            col  = (120, 200, 100) if header != "COMMANDS" else (200, 180, 80)
-            surf = font_h.render(header, True, col)
-            content_surf.blit(surf, (0, cy))
-            cy += 20
-        if body:
-            is_code  = body.startswith(("move(", "plant(", "harvest("))
-            color    = (180, 220, 255) if is_code else (190, 210, 185)
-            font_use = font_code if is_code else font_b
-            indent   = 8 if is_code else 0
-            surf = font_use.render(body, True, color)
-            content_surf.blit(surf, (indent, cy))
-            cy += 18
+    for kind, text, indent in rows:
+        if kind == "section":
+            # small gap above each section header
+            cy += 4
+            # tinted pill background behind the section label
+            label_surf = font_section.render(text, True, (140, 210, 110))
+            pill_w = label_surf.get_width() + 12
+            pill_h = label_surf.get_height() + 2
+            pygame.draw.rect(content_surf, (30, 55, 25, 180),
+                             pygame.Rect(0, cy - 1, pill_w, pill_h), border_radius=3)
+            content_surf.blit(label_surf, (6, cy))
+            cy += ROW_H["section"] - 4
+
+        elif kind == "sub":
+            # subsection label — indented, yellow-ish, with a short rule after it
+            label_surf = font_sub.render(text, True, (210, 190, 80))
+            content_surf.blit(label_surf, (indent, cy))
+            # horizontal rule from end of label to right edge
+            rule_x = indent + label_surf.get_width() + 6
+            rule_y = cy + label_surf.get_height() // 2
+            pygame.draw.line(content_surf, (80, 70, 30),
+                             (rule_x, rule_y), (CONTENT_W - 4, rule_y), 1)
+            cy += ROW_H["sub"]
+
+        elif kind == "code":
+            label_surf = font_code.render(text, True, (170, 215, 255))
+            content_surf.blit(label_surf, (indent, cy))
+            cy += ROW_H["code"]
+
+        elif kind == "body":
+            label_surf = font_body.render(text, True, (190, 210, 185))
+            content_surf.blit(label_surf, (indent, cy))
+            cy += ROW_H["body"]
+
+        elif kind == "locked":
+            label_surf = font_locked.render(text, True, (110, 110, 100))
+            content_surf.blit(label_surf, (indent, cy))
+            cy += ROW_H["locked"]
 
     # ── draw the modal panel ───────────────────────────────────────────────────
     panel = pygame.Surface((mw, mh), pygame.SRCALPHA)
