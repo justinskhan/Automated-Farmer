@@ -10,7 +10,7 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
- 
+
 pygame.init()
 pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
@@ -32,9 +32,10 @@ ide        = IDE(20, 20)
 overlay    = Overlay()
  
 # game states
-STATE_START   = "start"
-STATE_PLAYING = "playing"
-game_state    = STATE_START
+STATE_START       = "start"
+STATE_PLAYING     = "playing"
+STATE_PROGRESSION = "progression"
+game_state        = STATE_START
  
 # start screen animation state
 _btn_hovered      = False
@@ -521,8 +522,31 @@ def _check_forbidden_constructs(tree: ast.AST) -> str | None:
     return None
  
  
+def _draw_progression_screen(surface: pygame.Surface) -> pygame.Rect:
+    """Draw the level selection screen. Returns the back button rect."""
+    sw, sh = surface.get_size()
+    surface.fill((173, 216, 230))
+
+    font_title = pygame.font.SysFont("Consolas", 36, bold=True)
+    title_surf = font_title.render("Level Select", True, (30, 80, 30))
+    surface.blit(title_surf, (sw // 2 - title_surf.get_width() // 2, 60))
+
+    # back button
+    btn_w, btn_h = 160, 48
+    back_rect    = pygame.Rect(sw // 2 - btn_w // 2, sh - btn_h - 40, btn_w, btn_h)
+    back_hovered = back_rect.collidepoint(pygame.mouse.get_pos())
+    pygame.draw.rect(surface, (70, 210, 100) if back_hovered else (50, 180, 80), back_rect, border_radius=6)
+    pygame.draw.rect(surface, (30, 100, 50), back_rect, 2, border_radius=6)
+    font_btn = pygame.font.SysFont("Consolas", 18, bold=True)
+    lbl = font_btn.render("Back", True, (255, 255, 255))
+    surface.blit(lbl, (back_rect.centerx - lbl.get_width() // 2,
+                        back_rect.centery - lbl.get_height() // 2))
+
+    return back_rect
+
+
 def _draw_hud(surface: pygame.Surface, lv) -> tuple:
-    """Draw the in-game HUD. Returns (center_btn_rect, htp_btn_rect)."""
+    """Draw the in-game HUD. Returns (center_btn_rect, htp_btn_rect, prog_btn_rect)."""
     obj        = lv.objective
     font_title = pygame.font.SysFont("Consolas", 16, bold=True)
     font_body  = pygame.font.SysFont("Consolas", 14)
@@ -541,8 +565,22 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     panel_h = padding * 2 + len(obj_lines) * line_h
  
     sx = surface.get_width() - panel_w - margin
-    sy = margin
- 
+
+    # Level Select button at the very top of the HUD stack
+    prog_h    = 36
+    prog_rect = pygame.Rect(sx, margin, panel_w, prog_h)
+    sy        = margin + prog_h + 6
+
+    prog_hovered = prog_rect.collidepoint(pygame.mouse.get_pos())
+    prog_bg      = pygame.Surface((panel_w, prog_h), pygame.SRCALPHA)
+    prog_bg.fill((30, 30, 45, 210) if prog_hovered else (15, 15, 25, 190))
+    surface.blit(prog_bg, (prog_rect.x, prog_rect.y))
+    pygame.draw.rect(surface, (80, 80, 110), prog_rect, 1, border_radius=4)
+    font_prog = pygame.font.SysFont("Consolas", 13, bold=True)
+    prog_lbl  = font_prog.render("Level Select", True, (255, 255, 255))
+    surface.blit(prog_lbl, (prog_rect.x + (panel_w - prog_lbl.get_width())  // 2,
+                             prog_rect.y + (prog_h  - prog_lbl.get_height()) // 2))
+
     # semi-transparent dark background
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 190))
@@ -646,8 +684,8 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     htp_lbl  = font_htp.render("How to Play", True, (255, 255, 255))
     surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
                              hy + (htp_h - htp_lbl.get_height()) // 2))
- 
-    return center_btn_rect, htp_btn_rect
+    
+    return center_btn_rect, htp_btn_rect, prog_rect
  
  
 ide.update_allowed(level.objective.allowed_commands)
@@ -659,6 +697,8 @@ frozen      = False
 # both HUD button rects are tracked so each can be hit-tested independently
 _center_btn: pygame.Rect | None = None
 _htp_btn:    pygame.Rect | None = None
+_prog_btn:   pygame.Rect | None = None
+_prog_back_btn: pygame.Rect | None = None
  
 while running:
     dt = clock.tick(60) / 1000.0
@@ -688,7 +728,14 @@ while running:
                     game_state = STATE_PLAYING
                     level.center_on(*screen.get_size())
             continue
- 
+
+        # handle progression screen clicks
+        if game_state == STATE_PROGRESSION:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if _prog_back_btn and _prog_back_btn.collidepoint(event.pos):
+                    game_state = STATE_PLAYING
+            continue
+
         # overlay swallows all input while frozen
         if frozen:
             if overlay.handle_event(event):
@@ -732,6 +779,11 @@ while running:
                 _show_htp_ingame = True
                 _htp_scroll_offset = 0
                 continue
+
+            # Level Select button — open the progression screen
+            if _prog_btn and _prog_btn.collidepoint(event.pos):
+                game_state = STATE_PROGRESSION
+                continue
  
         # pass events to the IDE, run code if the run button was pressed
         code = ide.handle_event(event)
@@ -763,14 +815,19 @@ while running:
  
     # keep a reference to the button rect for hit testing
     _current_btn_rect = None
- 
+
+    if game_state == STATE_PROGRESSION:
+        _prog_back_btn = _draw_progression_screen(screen)
+        pygame.display.flip()
+        continue
+
     if frozen:
         # still draw everything behind the overlay while frozen
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _center_btn, _htp_btn = _draw_hud(screen, level)
+        _center_btn, _htp_btn, _prog_btn = _draw_hud(screen, level)
         obj = level.objective
         overlay.draw(
             screen,
