@@ -19,7 +19,7 @@ _MOUTH      = (160, 115,  90)
 # can be adjusted for farmer speed
 _MOVE_COOLDOWN = 0.18
 
-# for now moves with WASD keys and only will move once previous move is made
+# farmer only moves via the in-game IDE, not keyboard input
 class Farmer:
     SPEED = 300  # pixels per second for smooth glide
 
@@ -34,36 +34,6 @@ class Farmer:
         self._target_pos: list[float] = list(self.pixel_pos)
         self._move_cooldown: float = 0.0
         self._arrived: bool = True
-
-    # function to handle input
-    def handle_input(self, level: "Level") -> None:
-        if self._move_cooldown > 0 or not self._arrived:
-            return
-        keys = pygame.key.get_pressed()
-        dr, dc = 0, 0
-        if keys[pygame.K_w]:
-            dr = -1
-        elif keys[pygame.K_s]:
-            dr = 1
-        elif keys[pygame.K_a]:
-            dc = -1
-        elif keys[pygame.K_d]:
-            dc = 1
-        else:
-            return
-        pos = level.find_tile(self.current_tile)
-        if pos is None:
-            return
-        r, c = pos
-        target = level.get_tile(r + dr, c + dc)
-        if target and target.walkable:
-            self.current_tile = target
-            self._target_pos = [
-                float(target.rect.centerx),
-                float(target.rect.centery),
-            ]
-            self._move_cooldown = _MOVE_COOLDOWN
-            self._arrived = False  # the farmer is moving
 
     # updating the farmer position
     def update(self, dt: float, level: "Level") -> None:
@@ -82,9 +52,6 @@ class Farmer:
             else:
                 self.pixel_pos[i] += step if diff > 0 else -step
         self._arrived = arrived_x and arrived_y
-        # makes it so each input waits for previous to finish
-        if self._arrived:
-            self.handle_input(level)
 
     def snap_to_tile(self) -> None:
         self.pixel_pos = [
@@ -133,7 +100,7 @@ class Farmer:
         pygame.draw.rect(surface, _SHIRT,
             (rx(12),  ry(-6), arm_w, arm_h), border_radius=r(3))
 
-        # ── Body / overalls bib ────────────────────────────────
+        #Body / overalls bib
         body_w, body_h = r(24), r(20)
         pygame.draw.rect(surface, _OVERALLS,
             (rx(-12), ry(-8), body_w, body_h), border_radius=r(3))
@@ -149,7 +116,7 @@ class Farmer:
         pygame.draw.rect(surface, _OVERALLS_D,
             (rx(-4), ry(-4), r(8), r(6)), border_radius=r(1))
 
-        # ── Head ───────────────────────────────────────────────
+        # Head 
         head_r = r(11)
         head_cy = ry(-20)
         pygame.draw.circle(surface, _SKIN, (cx, head_cy), head_r)

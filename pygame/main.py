@@ -1,7 +1,7 @@
+import asyncio
+import sys
 import pygame
 import ast
-import signal
-import threading
 from background import Background
 from level import LevelManager
 from farmer import Farmer
@@ -10,7 +10,7 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
- 
+
 pygame.init()
 pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
@@ -43,7 +43,7 @@ _current_btn_rect = None
  
 # in-game how to play modal state — tracks visibility, scroll offset, and the close button rect
 _show_htp_ingame   = False
-_htp_ingame_close: pygame.Rect | None = None
+_htp_ingame_close  = None
 _htp_scroll_offset = 0   # pixels scrolled down into the content
  
 # which example panel is currently open inside the modal — None, "for", or "while"
@@ -259,18 +259,22 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
     """Draw the in-game How to Play modal with a scrollable content area."""
     global _htp_scroll_offset
  
+ 
     sw, sh = surface.get_size()
+ 
  
     # dark semi-transparent backdrop covering the whole screen
     backdrop = pygame.Surface((sw, sh), pygame.SRCALPHA)
     backdrop.fill((0, 0, 0, 170))
     surface.blit(backdrop, (0, 0))
  
+ 
     # modal dimensions — height is capped so it always fits the window
     mw = 560
     mh = min(520, sh - 40)
     mx = (sw - mw) // 2
     my = (sh - mh) // 2
+ 
  
     # fixed header zone: title + divider
     HEADER_H    = 50
@@ -310,6 +314,7 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
     # build content rows from current level's allowed commands
     rows = _build_htp_content(level.objective.allowed_commands)
  
+ 
     # measure total content height
     content_h = 8
     for row in rows:
@@ -322,6 +327,7 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
     viewport_h = mh - HEADER_H
     max_scroll = max(0, content_h - viewport_h)
     _htp_scroll_offset = min(_htp_scroll_offset, max_scroll)
+ 
  
     # render content onto an off-screen surface
     content_surf = pygame.Surface((CONTENT_W, content_h), pygame.SRCALPHA)
@@ -346,6 +352,7 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
             content_surf.blit(label_surf, (6, cy))
             cy += ROW_H["section"] - 4
  
+ 
         elif kind == "sub":
             label_surf = font_sub.render(text, True, (210, 190, 80))
             content_surf.blit(label_surf, (indent, cy))
@@ -355,8 +362,9 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
                              (rule_x, rule_y), (CONTENT_W - 4, rule_y), 1)
             cy += ROW_H["sub"]
  
+ 
         elif kind == "code":
-            label_surf = font_code.render(text, True, (170, 215, 255))
+            label_surf = _font(13).render(text, True, (170, 215, 255))
             content_surf.blit(label_surf, (indent, cy))
             cy += ROW_H["code"]
  
@@ -366,12 +374,13 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
             cy += ROW_H["desc"]
  
         elif kind == "body":
-            label_surf = font_body.render(text, True, (190, 210, 185))
+            label_surf = _font(13).render(text, True, (190, 210, 185))
             content_surf.blit(label_surf, (indent, cy))
             cy += ROW_H["body"]
  
+ 
         elif kind == "locked":
-            label_surf = font_locked.render(text, True, (110, 110, 100))
+            label_surf = _font(13).render(text, True, (110, 110, 100))
             content_surf.blit(label_surf, (indent, cy))
             cy += ROW_H["locked"]
  
@@ -430,12 +439,16 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
     surface.set_clip(old_clip)
  
     # subtle fade at the bottom edge
+ 
+    # subtle fade at the bottom edge
     if _htp_scroll_offset < max_scroll:
+        fade_h    = 28
         fade_h    = 28
         fade_surf = pygame.Surface((mw - 4, fade_h), pygame.SRCALPHA)
         for i in range(fade_h):
             alpha = int(200 * i / fade_h)
-            pygame.draw.line(fade_surf, (20, 28, 18, alpha), (0, fade_h - 1 - i), (mw - 4, fade_h - 1 - i))
+            pygame.draw.line(fade_surf, (20, 28, 18, alpha),
+                             (0, fade_h - 1 - i), (mw - 4, fade_h - 1 - i))
         surface.blit(fade_surf, (mx + 2, my + mh - fade_h - 2))
  
     #scrollbar
@@ -455,6 +468,7 @@ def _draw_htp_modal_ingame(surface: pygame.Surface) -> tuple[pygame.Rect, list[t
     cy_btn     = my + 6
     close_rect    = pygame.Rect(cx_btn, cy_btn, close_size, close_size)
     close_hovered = close_rect.collidepoint(pygame.mouse.get_pos())
+ 
  
     close_col = (200, 60, 60) if close_hovered else (140, 40, 40)
     pygame.draw.rect(surface, close_col, close_rect, border_radius=4)
@@ -702,18 +716,19 @@ def _check_forbidden_constructs(tree: ast.AST) -> str | None:
  
  
 def _draw_hud(surface: pygame.Surface, lv) -> tuple:
-    """Draw the in-game HUD. Returns (center_btn_rect, htp_btn_rect)."""
+    """Draw the in-game HUD. Returns (center_btn_rect, htp_btn_rect, prog_btn_rect)."""
     obj        = lv.objective
-    font_title = pygame.font.SysFont("Consolas", 16, bold=True)
-    font_body  = pygame.font.SysFont("Consolas", 14)
-    font_time  = pygame.font.SysFont("Consolas", 22, bold=True)
-    font_label = pygame.font.SysFont("Consolas", 11)
+    font_title = _font(16, bold=True)
+    font_body  = _font(14)
+    font_time  = _font(22, bold=True)
+    font_label = _font(11)
  
     padding = 10
     line_h  = 20
     margin  = 12
  
-    obj_lines = [f"Level {lv.number}: {lv.name}", f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
+    obj_lines = [f"Level {lv.number}: {lv.name}",
+                 f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
  
     panel_w = max(font_title.size(obj_lines[0])[0],
                   font_body.size(obj_lines[1])[0]) + padding * 2
@@ -796,6 +811,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     htp_btn_rect = pygame.Rect(hx, hy, htp_w, htp_h)
     htp_hovered  = htp_btn_rect.collidepoint(pygame.mouse.get_pos())
  
+ 
     htp_bg_col = (30, 30, 45, 210) if htp_hovered else (15, 15, 25, 190)
     htp_bg = pygame.Surface((htp_w, htp_h), pygame.SRCALPHA)
     htp_bg.fill(htp_bg_col)
@@ -808,7 +824,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
                              hy + (htp_h - htp_lbl.get_height()) // 2))
  
-    return center_btn_rect, htp_btn_rect
+    return center_btn_rect, htp_btn_rect, prog_rect
  
  
 ide.update_allowed(level.objective.allowed_commands)
@@ -907,11 +923,6 @@ while running:
                     ide.log(f"Error: {err}", error=True)
                 else:
                     ide.log("Running code...")
-                    _launch_user_code(code)
-            except SyntaxError as e:
-                ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
-            except Exception as e:
-                ide.log(f"Error: {e}", error=True)
  
     if game_state == STATE_START:
         import math

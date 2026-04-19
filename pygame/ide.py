@@ -1,6 +1,57 @@
 import pygame
-import subprocess
- 
+import sys
+
+# pygame.scrap (clipboard) is not supported in pygbag/WASM — calling init()
+# in that environment raises pygame.error and kills the async task, which
+# is why pressing play used to freeze on the loading screen. Detect the
+# browser once here and use these helpers everywhere instead of calling
+# pygame.scrap directly, so desktop keeps full copy/paste support and the
+# browser build just silently no-ops clipboard operations.
+_IS_BROWSER = sys.platform in ("emscripten", "wasi")
+_scrap_ok: bool | None = None   # None = untested, True/False = known
+_scrap_fallback: str = ""       # in-memory clipboard used when scrap is unavailable
+
+
+def _scrap_available() -> bool:
+    """Return True if pygame.scrap can be used. Tries to init once, caches result."""
+    global _scrap_ok
+    if _scrap_ok is not None:
+        return _scrap_ok
+    if _IS_BROWSER:
+        _scrap_ok = False
+        return False
+    try:
+        if not pygame.scrap.get_init():
+            pygame.scrap.init()
+        _scrap_ok = True
+    except Exception:
+        _scrap_ok = False
+    return _scrap_ok
+
+
+def _clipboard_put(text: str) -> None:
+    """Copy text to the system clipboard, falling back to an in-memory store."""
+    global _scrap_fallback
+    _scrap_fallback = text
+    if not _scrap_available():
+        return
+    try:
+        pygame.scrap.put(pygame.SCRAP_TEXT, text.encode())
+    except Exception:
+        pass
+
+
+def _clipboard_get() -> str:
+    """Read text from the system clipboard, falling back to the in-memory store."""
+    if not _scrap_available():
+        return _scrap_fallback
+    try:
+        data = pygame.scrap.get(pygame.SCRAP_TEXT)
+        return data.decode() if data else _scrap_fallback
+    except Exception:
+        return _scrap_fallback
+
+
 #setting colors for IDE and the text
 _BG          = ( 30,  30,  40)
 _TITLE_BG    = ( 20,  20,  30)
@@ -296,26 +347,26 @@ class IDE:
             self.cursor_col  = len(self.lines[last])
             return
  
-        #Cmd+C = copy selected text to clipboard using macOS pbcopy
+        #Cmd+C = copy selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_c and ctrl_pressed:
             text = self._selected_text()
             if text:
-                subprocess.run("pbcopy", input=text.encode(), check=True)
+                _clipboard_put(text)
             return
- 
-        #Cmd+X = cut selected text to clipboard using macOS pbcopy
+
+        #Cmd+X = cut selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_x and ctrl_pressed:
             text = self._selected_text()
             if text:
-                subprocess.run("pbcopy", input=text.encode(), check=True)
+                _clipboard_put(text)
                 self._delete_selection()
             return
- 
-        #Cmd+V = paste from clipboard using macOS pbpaste, handles multi-line text
+
+        #Cmd+V = paste from clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_v and ctrl_pressed:
             #delete any active selection before pasting
             self._delete_selection()
-            text = subprocess.run("pbpaste", capture_output=True).stdout.decode()
+            text = _clipboard_get()
             if text:
                 #normalise line endings so windows and mac paste correctly
                 text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -431,11 +482,12 @@ class IDE:
     #creates the ide itself
     def draw(self, surface: pygame.Surface) -> None:
         font = self._font_obj()
- 
-        #initialise clipboard support the first time we draw
-        if not pygame.scrap.get_init():
-            pygame.scrap.init()
- 
+
+        #initialise clipboard support the first time we draw — safe in pygbag/WASM
+        #where pygame.scrap is unavailable and would otherwise crash the async task
+        _scrap_available()
+
+
         pygame.draw.rect(surface, _BG, self.rect, border_radius=6)
         pygame.draw.rect(surface, _BORDER, self.rect, 1, border_radius=6)
  
