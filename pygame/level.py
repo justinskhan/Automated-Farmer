@@ -42,7 +42,7 @@ LEVEL_2 = {
     "hint": "",
 }
  
-# level 3 - bigger grid, harvest 5 crops, no timer
+# level 3 - bigger grid, harvest 5 crops, no timer — for loops unlocked here
 LEVEL_3 = {
     "name": "Growing Season",
     "number": 3,
@@ -55,7 +55,7 @@ LEVEL_3 = {
     "objective": Objective(
         harvests_required=5,
         time_limit=None,
-        allowed_commands=["move", "plant", "harvest"],
+        allowed_commands=["move", "plant", "harvest", "for"],
     ),
     "hint": "",
 }
@@ -73,7 +73,7 @@ LEVEL_4 = {
     "objective": Objective(
         harvests_required=8,
         time_limit=90.0,
-        allowed_commands=["move", "plant", "harvest"],
+        allowed_commands=["move", "plant", "harvest", "for"],
     ),
     "hint": "",
 }
@@ -92,7 +92,7 @@ LEVEL_5 = {
     "objective": Objective(
         harvests_required=15,
         time_limit=120.0,
-        allowed_commands=["move", "plant", "harvest", "while"],
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
     ),
     "hint": "",
 }
