@@ -870,7 +870,7 @@ while running:
     farmer.draw(screen)
     ide.draw(screen)
     # draw HUD last so it sits on top of everything; capture both button rects for click handling
-    _center_btn, _htp_btn = _draw_hud(screen, level)
+    _center_btn, _htp_btn, _prog_btn = _draw_hud(screen, level)
  
     # draw the how to play modal on top of everything if it is open; capture close button rect
     if _show_htp_ingame:
