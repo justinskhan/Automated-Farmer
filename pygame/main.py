@@ -676,9 +676,11 @@ def harvest() -> None:
         ide.log("Crop not ready to harvest yet.", error=True)
         _wait_for_arrival()
         return
+    #get the crop name before removing it so we can pass it to record_harvest
+    crop_name = tile.crop.crop_type.name.lower()
     ide.log(f"Harvested: {tile.crop.crop_type.name}")
     tile.remove_crop()
-    level.objective.record_harvest()
+    level.objective.record_harvest(crop_name)
     _wait_for_arrival()
 
 
@@ -706,11 +708,19 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     line_h  = 20
     margin  = 12
 
-    obj_lines = [f"Level {lv.number}: {lv.name}",
-                 f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
+    #if level has specific crop requirements show each crop's progress
+    #otherwise show the generic harvest count
+    if obj.has_crop_requirements:
+        obj_lines = [f"Level {lv.number}: {lv.name}"]
+        for crop, required in obj.crop_requirements.items():
+            done = obj.crop_harvests_done.get(crop, 0)
+            obj_lines.append(f"{crop.capitalize()}: {done}/{required}")
+    else:
+        obj_lines = [f"Level {lv.number}: {lv.name}",
+                     f"Harvest {obj.harvests_done}/{obj.harvests_required} crops"]
 
     panel_w = max(font_title.size(obj_lines[0])[0],
-                  font_body.size(obj_lines[1])[0]) + padding * 2
+                  max(font_body.size(l)[0] for l in obj_lines[1:])) + padding * 2
     panel_h = padding * 2 + len(obj_lines) * line_h
 
     sx = surface.get_width() - panel_w - margin
@@ -723,10 +733,14 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
 
+    #draw level name in bright white-blue
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
-    surface.blit(font_body.render(obj_lines[1], True, (180, 220, 180)),
-                 (sx + padding, sy + padding + line_h))
+
+    #draw each progress line in green
+    for i, line in enumerate(obj_lines[1:]):
+        surface.blit(font_body.render(line, True, (180, 220, 180)),
+                     (sx + padding, sy + padding + line_h * (i + 1)))
 
     time_box_w = panel_w
     time_box_h = 54
