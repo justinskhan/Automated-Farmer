@@ -74,6 +74,19 @@ _EXAMPLE_CODE = {
         "    #count this harvest",
         "    harvested += 1",
     ],
+    # example for if/elif/else showing conditional movement
+    "if": [
+        "#moves right if harvested is 0",
+        "#moves left if harvested is 1",
+        "#otherwise moves down",
+        "harvested = 0",
+        "if harvested == 0:",
+        "    move(\"right\")",
+        "elif harvested == 1:",
+        "    move(\"left\")",
+        "else:",
+        "    move(\"down\")",
+    ],
 }
 
 
@@ -209,6 +222,12 @@ def _build_htp_content(allowed: list) -> list:
     else:
         rows.append(("locked", "harvest()  [locked]", 16))
         rows.append(("desc", "Harvests the grown crop on the current tile. Unlocks soon.", 16))
+
+    # Conditionals — if/elif/else are always available, no lock needed
+    rows.append(("sub", "Conditionals", 0))
+    rows.append(("desc", "Run a block of code only when a condition is true.", 16))
+    rows.append(("locked_example", "if <condition>:", 16, "if"))
+    rows.append(("desc", "Use elif for extra conditions, else as a fallback.", 16))
 
     # Loops
     rows.append(("sub", "Loops", 0))
@@ -782,7 +801,23 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
                              hy + (htp_h - htp_lbl.get_height()) // 2))
 
-    return center_btn_rect, htp_btn_rect
+    # reset button — sits below How to Play, red tinted to signal it's destructive
+    reset_btn_rect = pygame.Rect(hx, hy + htp_h + 6, htp_w, htp_h)
+    reset_hovered  = reset_btn_rect.collidepoint(pygame.mouse.get_pos())
+
+    reset_bg_col = (60, 20, 20, 210) if reset_hovered else (35, 15, 15, 190)
+    reset_bg = pygame.Surface((htp_w, htp_h), pygame.SRCALPHA)
+    reset_bg.fill(reset_bg_col)
+    surface.blit(reset_bg, (hx, hy + htp_h + 6))
+
+    pygame.draw.rect(surface, (120, 50, 50), reset_btn_rect, 1, border_radius=4)
+
+    font_reset = pygame.font.SysFont("Consolas", 14, bold=True)
+    reset_lbl  = font_reset.render("Reset Level", True, (255, 120, 120))
+    surface.blit(reset_lbl, (reset_btn_rect.x + (htp_w - reset_lbl.get_width())  // 2,
+                              reset_btn_rect.y + (htp_h - reset_lbl.get_height()) // 2))
+
+    return center_btn_rect, htp_btn_rect, reset_btn_rect
 
 
 ide.update_allowed(level.objective.allowed_commands)
@@ -793,6 +828,7 @@ frozen      = False
 
 _center_btn       = None
 _htp_btn          = None
+_reset_btn        = None   # reset button rect, updated each frame by _draw_hud
 _htp_example_btns = []
 
 while running:
@@ -872,6 +908,11 @@ while running:
                 _htp_example_open  = None
                 continue
 
+            # reset button — reloads the level, clears the IDE, resets the timer and farmer
+            if _reset_btn and _reset_btn.collidepoint(event.pos):
+                _reload_level()
+                continue
+
         code = ide.handle_event(event)
         if code is not None:
             try:
@@ -903,7 +944,7 @@ while running:
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _center_btn, _htp_btn = _draw_hud(screen, level)
+        _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
         obj = level.objective
         overlay.draw(
             screen,
@@ -943,7 +984,7 @@ while running:
     level.draw(screen)
     farmer.draw(screen)
     ide.draw(screen)
-    _center_btn, _htp_btn = _draw_hud(screen, level)
+    _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
 
     if _show_htp_ingame:
         _htp_ingame_close, _htp_example_btns = _draw_htp_modal_ingame(screen)
