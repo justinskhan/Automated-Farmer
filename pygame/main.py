@@ -1,7 +1,6 @@
+import asyncio
 import pygame
 import ast
-import asyncio
-import sys
 import math
 from background import Background
 from level import LevelManager
@@ -12,21 +11,11 @@ from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
  
-# detect if we are running inside a browser (pygbag/emscripten)
-# used to skip features that are unavailable in WASM (signal, threading, etc.)
-_IS_BROWSER = sys.platform in ("emscripten", "wasi")
- 
 pygame.init()
 pygame.key.set_repeat(400, 40)
 screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
 pygame.display.set_caption("Automated Farmer")
 clock = pygame.time.Clock()
- 
-# allow Ctrl+C in the terminal to quit the game cleanly (desktop only)
-# signal is not available in WASM so we skip it in the browser
-if not _IS_BROWSER:
-    import signal
-    signal.signal(signal.SIGINT, lambda s, f: pygame.event.post(pygame.event.Event(pygame.QUIT)))
  
 manager = LevelManager()
 manager.current.center_on(*screen.get_size())
@@ -81,7 +70,6 @@ _EXAMPLE_CODE = {
         "    #count this harvest",
         "    harvested += 1",
     ],
-    # example for if/elif/else showing conditional movement
     "if": [
         "#moves right if harvested is 0",
         "#moves left if harvested is 1",
@@ -197,21 +185,17 @@ def _draw_coloured_line(surface, font, line: str, x: int, y: int,
 def _build_htp_content(allowed: list) -> list:
     rows = []
  
-    # GOAL
     rows.append(("section", "GOAL", 0))
     rows.append(("body", "Harvest the required crops before time runs out.", 16))
  
-    # COMMANDS
     rows.append(("section", "COMMANDS", 0))
  
-    # Movement
     rows.append(("sub", "Movement", 0))
     rows.append(("desc", "Moves the farmer one tile in that direction.", 16))
     rows.append(("desc", "Can't walk off the grid or onto blocked tiles.", 16))
     rows.append(("code", 'move("up")      move("down")', 16))
     rows.append(("code", 'move("left")    move("right")', 16))
  
-    # Planting
     rows.append(("sub", "Planting", 0))
     if "plant" in allowed:
         rows.append(("desc", "Plants that crop on the current tile. Tile must be empty.", 16))
@@ -221,7 +205,6 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked", "plant()  [locked]", 16))
         rows.append(("desc", "Plants a crop on the current tile. Unlocks soon.", 16))
  
-    # Harvesting
     rows.append(("sub", "Harvesting", 0))
     if "harvest" in allowed:
         rows.append(("desc", "Picks the fully grown crop on the current tile. Crops must be fully grown first.", 16))
@@ -230,13 +213,11 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked", "harvest()  [locked]", 16))
         rows.append(("desc", "Harvests the grown crop on the current tile. Unlocks soon.", 16))
  
-    # Conditionals — if/elif/else are always available, no lock needed
     rows.append(("sub", "Conditionals", 0))
     rows.append(("desc", "Run a block of code only when a condition is true.", 16))
     rows.append(("locked_example", "if <condition>:", 16, "if"))
     rows.append(("desc", "Use elif for extra conditions, else as a fallback.", 16))
  
-    # Loops
     rows.append(("sub", "Loops", 0))
     if "for" in allowed:
         rows.append(("locked_example", "for i in range(n):", 16, "for"))
@@ -251,13 +232,11 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked_example", "while loops  [unlocks at level 5]", 16, "while"))
         rows.append(("desc", "Repeat a block of code until a condition becomes false.", 16))
  
-    # TIPS
     rows.append(("section", "TIPS", 0))
     rows.append(("body", "Crops must be fully grown before harvesting.", 16))
     rows.append(("body", "You can only plant on empty, walkable tiles.", 16))
     rows.append(("body", "New commands unlock as you progress.", 16))
  
-    # CONTROLS
     rows.append(("section", "CONTROLS", 0))
     rows.append(("body", "Click the Run button to play.", 16))
  
@@ -402,7 +381,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
                                   _EXAMPLE_CODE[example_key])
                 cy += ph
  
-    # draw modal panel
     panel = pygame.Surface((mw, mh), pygame.SRCALPHA)
     panel.fill((20, 28, 18, 245))
     surface.blit(panel, (mx, my))
@@ -417,7 +395,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
                      (mx + 8,      my + HEADER_H - 4),
                      (mx + mw - 8, my + HEADER_H - 4), 1)
  
-    # blit visible slice of content
     clip_rect = pygame.Rect(0, _htp_scroll_offset, CONTENT_W, viewport_h)
     dest_x    = CONTENT_X
     dest_y    = my + HEADER_H
@@ -427,7 +404,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
     surface.blit(content_surf, (dest_x, dest_y), clip_rect)
     surface.set_clip(old_clip)
  
-    # fade at bottom edge
     if _htp_scroll_offset < max_scroll:
         fade_h    = 28
         fade_surf = pygame.Surface((mw - 4, fade_h), pygame.SRCALPHA)
@@ -437,7 +413,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
                              (0, fade_h - 1 - i), (mw - 4, fade_h - 1 - i))
         surface.blit(fade_surf, (mx + 2, my + mh - fade_h - 2))
  
-    # scrollbar
     if max_scroll > 0:
         sb_x      = mx + mw - SCROLLBAR_W - 4
         sb_y      = my + HEADER_H + 2
@@ -448,7 +423,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
         pygame.draw.rect(surface, (40, 50, 40), pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h), border_radius=4)
         pygame.draw.rect(surface, (90, 160, 80), pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h), border_radius=4)
  
-    # X close button
     close_size    = 28
     cx_btn        = mx + mw - close_size - 6
     cy_btn        = my + 6
@@ -467,7 +441,6 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
     pygame.draw.line(surface, (255, 255, 255),
                      (cx_center + pad, cy_center - pad), (cx_center - pad, cy_center + pad), 2)
  
-    # convert content-surface button rects to screen-space
     example_btns_screen = []
     for key, cs_rect in example_btns_content:
         screen_rect = pygame.Rect(
@@ -541,63 +514,91 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> pygame.Rect:
  
  
 # ---------------------------------------------------------------------------
-# Async user-code execution system
+# User code execution — uses a simple step/done event pair so the farmer
+# animates smoothly between each command the player writes.
+# Threading is used on desktop; in the browser (pygbag/WASM) threading is
+# not available so we fall back to a synchronous generator-based stepper.
 # ---------------------------------------------------------------------------
-# In the browser (pygbag/WASM) threading is not available, so we run user
-# code as an asyncio Task. move/plant/harvest each post a "step done" signal
-# and then suspend via an asyncio.Event, letting the main loop render a frame
-# before advancing to the next command.  On desktop the same path is used so
-# behaviour is identical on both platforms.
  
-_user_task: asyncio.Task | None = None   # currently running user-code task
-_arrival_event: asyncio.Event  = asyncio.Event()   # set by main loop when farmer arrives
-_cancel_flag: bool = False               # set to True when we want to abort user code
+import sys as _sys
+_IS_BROWSER = _sys.platform in ("emscripten", "wasi")
  
+if not _IS_BROWSER:
+    import threading as _threading
  
-def _stop_user_code() -> None:
-    """Cancel any running user-code task and reset all async state."""
-    global _user_task, _cancel_flag
-    if _user_task and not _user_task.done():
-        _cancel_flag = True
-        _arrival_event.set()   # unblock any waiting coroutine so it can exit
-        _user_task.cancel()
-    _user_task    = None
-    _cancel_flag  = False
-    _arrival_event.clear()
+_step_event = None
+_done_event = None
+_stop_event = None
+_user_thread = None
+ 
+# browser fallback state
+_pending_actions: list = []
+_action_index: int = 0
  
  
-async def _wait_for_arrival() -> None:
-    """
-    Called inside user code after each move/plant/harvest.
-    Suspends the user-code coroutine until the main loop signals that the
-    farmer animation has finished and it is safe to take the next step.
-    Raises SystemExit if the task has been cancelled (level reset/advance).
-    """
-    global _cancel_flag
-    if _cancel_flag:
+def _init_events():
+    global _step_event, _done_event, _stop_event
+    if not _IS_BROWSER:
+        import threading
+        _step_event = threading.Event()
+        _done_event = threading.Event()
+        _stop_event = threading.Event()
+ 
+ 
+_init_events()
+ 
+ 
+def _stop_user_thread() -> None:
+    global _user_thread, _pending_actions, _action_index
+    if _IS_BROWSER:
+        _pending_actions = []
+        _action_index = 0
+        return
+    if _user_thread and _user_thread.is_alive():
+        _stop_event.set()
+        _step_event.set()
+        _user_thread.join(timeout=1.0)
+    _user_thread = None
+    _stop_event.clear()
+    _step_event.clear()
+    _done_event.clear()
+ 
+ 
+def _wait_for_arrival() -> None:
+    if _IS_BROWSER:
+        return  # browser: stepping is handled in the main loop
+    if _stop_event.is_set():
         raise SystemExit
-    _arrival_event.clear()
-    # yield control back to the event loop so the main loop can render a frame
-    await _arrival_event.wait()
-    if _cancel_flag:
+    _done_event.set()
+    _step_event.wait()
+    _step_event.clear()
+    if _stop_event.is_set():
         raise SystemExit
- 
- 
-async def _run_user_code(compiled, ns: dict) -> None:
-    """Execute the compiled user script inside the provided namespace."""
-    try:
-        exec(compiled, ns)
-    except SystemExit:
-        pass
-    except Exception as e:
-        ide.log(f"Error: {e}", error=True)
  
  
 def _launch_user_code(code: str) -> None:
-    """Compile and launch the user's script as an asyncio task."""
-    global _user_task
-    _stop_user_code()
+    global _user_thread, _pending_actions, _action_index
  
+    if _IS_BROWSER:
+        # In the browser we record all actions up front then replay them
+        # one per frame in the main loop via _tick_browser_actions().
+        _pending_actions = []
+        _action_index = 0
+        try:
+            compiled = compile(code, "<ide>", "exec")
+            exec(compiled, {
+                "move": _record_move,
+                "plant": _record_plant,
+                "harvest": _record_harvest,
+            })
+        except SyntaxError as e:
+            ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
+        except Exception as e:
+            ide.log(f"Error: {e}", error=True)
+        return
+ 
+    # Desktop path — threaded execution
+    _stop_user_thread()
     try:
         compiled = compile(code, "<ide>", "exec")
     except SyntaxError as e:
@@ -607,14 +608,60 @@ def _launch_user_code(code: str) -> None:
         ide.log(f"Error: {e}", error=True)
         return
  
-    # build the namespace with async-aware wrappers for move/plant/harvest
-    ns = {"move": move, "plant": plant, "harvest": harvest}
-    _user_task = asyncio.ensure_future(_run_user_code(compiled, ns))
+    def _run() -> None:
+        try:
+            exec(compiled, {"move": move, "plant": plant, "harvest": harvest})
+        except SystemExit:
+            pass
+        except Exception as e:
+            ide.log(f"Error: {e}", error=True)
+ 
+    _step_event.clear()
+    _done_event.clear()
+    _user_thread = _threading.Thread(target=_run, daemon=True)
+    _user_thread.start()
+ 
+ 
+# ---------------------------------------------------------------------------
+# Browser action recorder — replaces the real commands during exec so we
+# can collect them all synchronously and replay them one-per-frame later.
+# ---------------------------------------------------------------------------
+ 
+def _record_move(direction: str) -> None:
+    _pending_actions.append(("move", direction))
+ 
+def _record_plant(crop_name: str) -> None:
+    _pending_actions.append(("plant", crop_name))
+ 
+def _record_harvest() -> None:
+    _pending_actions.append(("harvest", None))
+ 
+ 
+def _tick_browser_actions() -> bool:
+    """
+    Called once per frame in the browser path.
+    Executes the next pending action if the farmer has arrived.
+    Returns True if there are still actions left to process.
+    """
+    global _action_index
+    if _action_index >= len(_pending_actions):
+        return False
+    if not farmer._arrived:
+        return True  # wait for animation to finish
+    action, arg = _pending_actions[_action_index]
+    _action_index += 1
+    if action == "move":
+        move(arg)
+    elif action == "plant":
+        plant(arg)
+    elif action == "harvest":
+        harvest()
+    return _action_index < len(_pending_actions)
  
  
 def _reload_level() -> None:
     global level, farmer
-    _stop_user_code()
+    _stop_user_thread()
     manager.reload(*screen.get_size())
     level  = manager.current
     farmer = Farmer(level.start_tile, level.TILE_SIZE)
@@ -628,7 +675,7 @@ def _reload_level() -> None:
  
 def _advance_level() -> None:
     global level, farmer
-    _stop_user_code()
+    _stop_user_thread()
     if not manager.next_level(*screen.get_size()):
         manager.reload(*screen.get_size())
     level  = manager.current
@@ -641,46 +688,7 @@ def _advance_level() -> None:
     ide.update_allowed(level.objective.allowed_commands)
  
  
-# ---------------------------------------------------------------------------
-# Game commands available to the user in the IDE
-# ---------------------------------------------------------------------------
-# These are plain synchronous functions whose bodies call the async
-# _wait_for_arrival() via asyncio.get_event_loop().run_until_complete().
-# However, because we are already inside a running event loop (pygbag runs
-# everything inside asyncio), we cannot use run_until_complete.  Instead the
-# functions are actually async coroutines: the exec namespace maps "move" to
-# the coroutine, and the user's script is itself exec'd inside an async
-# coroutine (_run_user_code), so `await move(...)` works transparently.
-#
-# NOTE: users write move("right") without await — to support this we wrap
-# the return value inside _run_user_code using a small trampoline that
-# checks whether the called value is a coroutine and awaits it if so.
-# The simplest approach that keeps user syntax clean: make the exec namespace
-# contain plain sync functions that schedule an await via a shared queue.
-#
-# Simplest correct approach for pygbag: user code is exec'd synchronously
-# but each command suspends via _arrival_event so the event loop can tick.
-# We achieve this by running _run_user_code as an async task and making
-# move/plant/harvest async functions that the exec'd code calls.
-# Because exec'd code cannot use `await`, we instead run the user code
-# inside a thread-like coroutine using a generator trick: we give the user
-# synchronous wrappers that push a future onto a queue and block on it.
-#
-# Final clean solution: user code is wrapped at exec time to be a coroutine
-# using ast transformation — but that is complex.  The pragmatic solution
-# used here: move/plant/harvest are synchronous functions that directly set
-# the farmer target and then add an asyncio.Future to a pending list; the
-# main loop resolves the future once the farmer arrives.  User code runs in
-# its own asyncio Task, awaiting each future in sequence.
-# ---------------------------------------------------------------------------
- 
-# pending future resolved by the main loop when farmer._arrived is True
-_pending_step: asyncio.Future | None = None
- 
- 
-async def move(direction: str) -> None:
-    """Move the farmer one tile in the given direction and wait for arrival."""
-    global _pending_step
+def move(direction: str) -> None:
     pos = level.find_tile(farmer.current_tile)
     if pos is None:
         return
@@ -697,14 +705,15 @@ async def move(direction: str) -> None:
         farmer.current_tile = target
         farmer._target_pos  = [float(target.rect.centerx), float(target.rect.centery)]
         farmer._arrived     = False
-    await _wait_for_arrival()
+    if not _IS_BROWSER:
+        _wait_for_arrival()
  
  
-async def plant(crop_name: str) -> None:
-    """Plant a crop on the current tile and wait one step."""
+def plant(crop_name: str) -> None:
     if "plant" not in level.objective.allowed_commands:
         ide.log("plant() is locked on this level.", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
     crop_map = {
         "wheat":  CropType.WHEAT,
@@ -715,38 +724,43 @@ async def plant(crop_name: str) -> None:
     crop_type = crop_map.get(crop_name.lower())
     if crop_type is None:
         ide.log(f"Unknown crop: {crop_name}", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
     tile = farmer.current_tile
     if tile.crop is not None:
         ide.log("Tile already has a crop.", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
     if not tile.plant(Crop(crop_type, start_growth=0.0)):
         ide.log("Tile is recovering, wait before replanting.", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
     ide.log(f"Planted: {crop_name}")
-    await _wait_for_arrival()
+    if not _IS_BROWSER:
+        _wait_for_arrival()
  
  
-async def harvest() -> None:
-    """Harvest the fully grown crop on the current tile and wait one step."""
+def harvest() -> None:
     tile = farmer.current_tile
     if tile.crop is None:
         ide.log("No crop to harvest here.", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
     if not tile.crop.grown:
         ide.log("Crop not ready to harvest yet.", error=True)
-        await _wait_for_arrival()
+        if not _IS_BROWSER:
+            _wait_for_arrival()
         return
-    #get the crop name before removing it so we can pass it to record_harvest
     crop_name = tile.crop.crop_type.name.lower()
     ide.log(f"Harvested: {tile.crop.crop_type.name}")
     tile.remove_crop()
     level.objective.record_harvest(crop_name)
-    await _wait_for_arrival()
+    if not _IS_BROWSER:
+        _wait_for_arrival()
  
  
 def _check_forbidden_constructs(tree: ast.AST):
@@ -773,8 +787,6 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     line_h  = 20
     margin  = 12
  
-    #if level has specific crop requirements show each crop's progress
-    #otherwise show the generic harvest count
     if obj.has_crop_requirements:
         obj_lines = [f"Level {lv.number}: {lv.name}"]
         for crop, required in obj.crop_requirements.items():
@@ -798,11 +810,9 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     pygame.draw.rect(surface, (80, 80, 110),
                      pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
  
-    #draw level name in bright white-blue
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
  
-    #draw each progress line in green
     for i, line in enumerate(obj_lines[1:]):
         surface.blit(font_body.render(line, True, (180, 220, 180)),
                      (sx + padding, sy + padding + line_h * (i + 1)))
@@ -880,7 +890,6 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
                              hy + (htp_h - htp_lbl.get_height()) // 2))
  
-    # reset button — sits below How to Play, red tinted to signal it's destructive
     reset_btn_rect = pygame.Rect(hx, hy + htp_h + 6, htp_w, htp_h)
     reset_hovered  = reset_btn_rect.collidepoint(pygame.mouse.get_pos())
  
@@ -907,26 +916,17 @@ frozen      = False
  
 _center_btn       = None
 _htp_btn          = None
-_reset_btn        = None   # reset button rect, updated each frame by _draw_hud
+_reset_btn        = None
 _htp_example_btns = []
  
  
-# ---------------------------------------------------------------------------
-# Main async loop — required by pygbag so the browser stays responsive.
-# The key change from the original synchronous while loop is:
-#   1. The loop is wrapped in `async def main()`
-#   2. `await asyncio.sleep(0)` is called every frame to yield control back
-#      to the browser's JavaScript event loop between frames.
-#   3. When the farmer has arrived at its target tile the _arrival_event is
-#      set, which unblocks any waiting user-code coroutine so it can advance
-#      to its next command on the following frame.
-# ---------------------------------------------------------------------------
 async def main():
-    global running, frozen, frame_count
-    global game_state, _btn_hovered, _pulse_timer, _current_btn_rect
-    global _show_htp_ingame, _htp_ingame_close, _htp_scroll_offset, _htp_example_open
-    global _center_btn, _htp_btn, _reset_btn, _htp_example_btns
-    global level, farmer, screen
+    global running, frozen, game_state, level, farmer
+    global _btn_hovered, _pulse_timer, _current_btn_rect
+    global _show_htp_ingame, _htp_ingame_close, _htp_scroll_offset
+    global _htp_example_open, _htp_example_btns
+    global _center_btn, _htp_btn, _reset_btn
+    global frame_count
  
     while running:
         dt = clock.tick(60) / 1000.0
@@ -937,7 +937,7 @@ async def main():
  
             elif event.type == pygame.VIDEORESIZE:
                 old_w, old_h = screen.get_size()
-                screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                new_screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 if game_state == STATE_PLAYING:
                     sx = event.w / old_w
                     sy = event.h / old_h
@@ -1005,7 +1005,6 @@ async def main():
                     _htp_example_open  = None
                     continue
  
-                # reset button — reloads the level, clears the IDE, resets the timer and farmer
                 if _reset_btn and _reset_btn.collidepoint(event.pos):
                     _reload_level()
                     continue
@@ -1032,7 +1031,6 @@ async def main():
             _current_btn_rect = _draw_start_screen(screen, pulse)
             _btn_hovered = _current_btn_rect.collidepoint(mouse_pos)
             pygame.display.flip()
-            # yield to the browser every frame so the page stays responsive
             await asyncio.sleep(0)
             continue
  
@@ -1055,7 +1053,6 @@ async def main():
                 obj.time_limit,
             )
             pygame.display.flip()
-            # yield to the browser every frame so the page stays responsive
             await asyncio.sleep(0)
             continue
  
@@ -1065,18 +1062,23 @@ async def main():
  
         if obj.status != ObjectiveStatus.PLAYING and not frozen:
             frozen = True
-            _stop_user_code()
+            _stop_user_thread()
  
-        # if user-code task is waiting for the farmer to arrive, and the farmer
-        # has now arrived, signal the arrival event so the task can continue
-        if (
-            not frozen
-            and _user_task is not None
-            and not _user_task.done()
-            and farmer._arrived
-            and not _arrival_event.is_set()
-        ):
-            _arrival_event.set()
+        # Desktop: step threaded user code forward once farmer arrives
+        if not _IS_BROWSER:
+            if (
+                not frozen
+                and _user_thread is not None
+                and _user_thread.is_alive()
+                and _done_event.is_set()
+                and farmer._arrived
+            ):
+                _done_event.clear()
+                _step_event.set()
+        else:
+            # Browser: tick the pre-recorded action queue one step per frame
+            if not frozen:
+                _tick_browser_actions()
  
         farmer.update(dt, level)
         ide.update(dt)
@@ -1097,18 +1099,13 @@ async def main():
         pygame.display.flip()
  
         frame_count += 1
-        if frame_count % 30 == 0:
+        if frame_count % 300 == 0:  # reduced from 30 to avoid console spam in browser
             print_grid(level)
  
-        # yield to the browser every frame — this is the critical fix that
-        # prevents the page from becoming unresponsive under pygbag/WASM
         await asyncio.sleep(0)
  
-    _stop_user_code()
+    _stop_user_thread()
     pygame.quit()
  
  
-# entry point — asyncio.run() works on desktop; pygbag replaces it with its
-# own scheduler that drives the coroutine from JavaScript's requestAnimationFrame
 asyncio.run(main())
- 
