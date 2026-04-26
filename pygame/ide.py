@@ -1,6 +1,6 @@
 import pygame
 import sys
-
+ 
 # pygame.scrap (clipboard) is not supported in pygbag/WASM — calling init()
 # in that environment raises pygame.error and kills the async task, which
 # is why pressing play used to freeze on the loading screen. Detect the
@@ -10,8 +10,8 @@ import sys
 _IS_BROWSER = sys.platform in ("emscripten", "wasi")
 _scrap_ok: bool | None = None   # None = untested, True/False = known
 _scrap_fallback: str = ""       # in-memory clipboard used when scrap is unavailable
-
-
+ 
+ 
 def _scrap_available() -> bool:
     """Return True if pygame.scrap can be used. Tries to init once, caches result."""
     global _scrap_ok
@@ -27,8 +27,8 @@ def _scrap_available() -> bool:
     except Exception:
         _scrap_ok = False
     return _scrap_ok
-
-
+ 
+ 
 def _clipboard_put(text: str) -> None:
     """Copy text to the system clipboard, falling back to an in-memory store."""
     global _scrap_fallback
@@ -39,8 +39,8 @@ def _clipboard_put(text: str) -> None:
         pygame.scrap.put(pygame.SCRAP_TEXT, text.encode())
     except Exception:
         pass
-
-
+ 
+ 
 def _clipboard_get() -> str:
     """Read text from the system clipboard, falling back to the in-memory store."""
     if not _scrap_available():
@@ -50,8 +50,8 @@ def _clipboard_get() -> str:
         return data.decode() if data else _scrap_fallback
     except Exception:
         return _scrap_fallback
-
-
+ 
+ 
 #setting colors for IDE and the text
 _BG          = ( 30,  30,  40)
 _TITLE_BG    = ( 20,  20,  30)
@@ -81,6 +81,11 @@ _GRIP_SIZE   = 14
 _MIN_W       = 200
 _MIN_H       = 120
 _OUTPUT_H    = 60
+ 
+# KMOD_CTRL covers Ctrl on Windows/Linux and the browser.
+# KMOD_META covers Cmd on macOS.
+# Combining both means copy/paste shortcuts work on every platform.
+_CTRL_OR_CMD = pygame.KMOD_CTRL | pygame.KMOD_META
  
 #Goal: 
 #Setting an IDE window that mimics vscode that has a run button and is resizable  
@@ -335,10 +340,13 @@ class IDE:
     def _handle_key(self, event: pygame.event.Event) -> None:
         row, col = self.cursor_row, self.cursor_col
         line = self.lines[row]
-        ctrl_pressed  = pygame.key.get_mods() & pygame.KMOD_META
+ 
+        # _CTRL_OR_CMD detects Ctrl on Windows/Linux/browser AND Cmd on macOS
+        # so that copy/paste/select-all shortcuts work on every platform
+        ctrl_pressed  = pygame.key.get_mods() & _CTRL_OR_CMD
         shift_pressed = pygame.key.get_mods() & pygame.KMOD_SHIFT
  
-        #Ctrl+A = select all lines
+        #Ctrl+A / Cmd+A = select all lines
         if event.key == pygame.K_a and ctrl_pressed:
             self._sel_anchor = (0, 0)
             last             = len(self.lines) - 1
@@ -347,22 +355,22 @@ class IDE:
             self.cursor_col  = len(self.lines[last])
             return
  
-        #Cmd+C = copy selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
+        #Ctrl+C / Cmd+C = copy selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_c and ctrl_pressed:
             text = self._selected_text()
             if text:
                 _clipboard_put(text)
             return
-
-        #Cmd+X = cut selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
+ 
+        #Ctrl+X / Cmd+X = cut selected text to clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_x and ctrl_pressed:
             text = self._selected_text()
             if text:
                 _clipboard_put(text)
                 self._delete_selection()
             return
-
-        #Cmd+V = paste from clipboard (uses safe helper so pygbag/WASM no-ops)
+ 
+        #Ctrl+V / Cmd+V = paste from clipboard (uses safe helper so pygbag/WASM no-ops)
         if event.key == pygame.K_v and ctrl_pressed:
             #delete any active selection before pasting
             self._delete_selection()
@@ -482,12 +490,12 @@ class IDE:
     #creates the ide itself
     def draw(self, surface: pygame.Surface) -> None:
         font = self._font_obj()
-
+ 
         #initialise clipboard support the first time we draw — safe in pygbag/WASM
         #where pygame.scrap is unavailable and would otherwise crash the async task
         _scrap_available()
-
-
+ 
+ 
         pygame.draw.rect(surface, _BG, self.rect, border_radius=6)
         pygame.draw.rect(surface, _BORDER, self.rect, 1, border_radius=6)
  
@@ -593,3 +601,4 @@ class IDE:
             pygame.draw.line(surface, grip_col,
                              (grip.right - offset, grip.bottom - 2),
                              (grip.right - 2, grip.bottom - offset), 1)
+ 
