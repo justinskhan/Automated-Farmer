@@ -186,19 +186,19 @@ LEVEL_9 = {
     "hint": "",
 }
  
-# level 10 -  massive grid, heavy obstacles, very tight timer
-# farmer must navigate a complex obstacle layout and harvest every crop type
+# level 10 - alternating corridor walls force the farmer to snake through
+# each row, requires efficient loop logic to finish in time
 LEVEL_10 = {
     "name": "The Final Harvest",
     "number": 10,
     "grid": [
-        "F...X...",
-        "....X...",
-        "XXXX.XXX",
+        "F.......",
+        "XXXXXXX.",
         "........",
-        "XXX.XXXX",
-        "...X....",
-        "...X....",
+        ".XXXXXXX",
+        "........",
+        "XXXXXXX.",
+        "........",
         "........",
     ],
     "objective": Objective(
@@ -210,8 +210,394 @@ LEVEL_10 = {
     "hint": "",
 }
  
-_ALL_LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5,
-               LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9, LEVEL_10]
+# level 11 - scattered obstacle clusters across an open grid
+# farmer must weave between them to reach all farmable tiles
+LEVEL_11 = {
+    "name": "The Spiral",
+    "number": 11,
+    "grid": [
+        "F.......",
+        "..XXX...",
+        "........",
+        "...XXX..",
+        "........",
+        "..XXX...",
+        "........",
+        "........",
+    ],
+    "objective": Objective(
+        harvests_required=16,
+        time_limit=55.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 4, "corn": 4, "tomato": 4, "carrot": 4},
+    ),
+    "hint": "",
+}
+ 
+# level 12 - columns of obstacles with open paths on both edges
+# farmer must sweep up and down between the obstacle columns
+LEVEL_12 = {
+    "name": "Checkerboard",
+    "number": 12,
+    "grid": [
+        "F.......",
+        ".X.X.X..",
+        ".X.X.X..",
+        ".X.X.X..",
+        ".X.X.X..",
+        ".X.X.X..",
+        ".X.X.X..",
+        "........",
+    ],
+    "objective": Objective(
+        harvests_required=18,
+        time_limit=55.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 5, "corn": 5, "tomato": 4, "carrot": 4},
+    ),
+    "hint": "",
+}
+ 
+# level 13 - alternating corridor walls, farmer must snake through each row
+# gaps alternate left and right so the farmer zigzags down the grid
+LEVEL_13 = {
+    "name": "The Tunnel",
+    "number": 13,
+    "grid": [
+        "F.........",
+        "XXXXXXXXX.",
+        "..........",
+        ".XXXXXXXXX",
+        "..........",
+        "XXXXXXXXX.",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=18,
+        time_limit=60.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 5, "corn": 5, "tomato": 4, "carrot": 4},
+    ),
+    "hint": "",
+}
+ 
+# level 14 - L-shaped walls split the grid into connected regions
+# farmer starts top-left and must navigate along the open edges
+LEVEL_14 = {
+    "name": "Four Corners",
+    "number": 14,
+    "grid": [
+        "F.........",
+        "....XXXXXX",
+        "....XXXXXX",
+        "....XXXXXX",
+        ".XXXXXXXXX",
+        ".XXXXXXXXX",
+        ".XXXXXXXXX",
+        "....XXXXXX",
+        "....XXXXXX",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=20,
+        time_limit=55.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 5, "corn": 5, "tomato": 5, "carrot": 5},
+    ),
+    "hint": "",
+}
+ 
+# level 15 - walls block large sections but alternate sides each row
+# farmer must find the gap on each wall to pass through to the next corridor
+LEVEL_15 = {
+    "name": "The Archipelago",
+    "number": 15,
+    "grid": [
+        "F..........",
+        "..XXXXXXXX.",
+        "...........",
+        "XXXXXXXX...",
+        "...........",
+        "...XXXXXXXX",
+        "...........",
+        ".XXXXXXXX..",
+        "...........",
+    ],
+    "objective": Objective(
+        harvests_required=20,
+        time_limit=50.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 5, "corn": 5, "tomato": 5, "carrot": 5},
+    ),
+    "hint": "",
+}
+ 
+# level 16 - long hallways separated by walls with alternating gaps
+# farmer must efficiently loop back and forth through each corridor
+LEVEL_16 = {
+    "name": "Hallways",
+    "number": 16,
+    "grid": [
+        "F.........",
+        "XXXXXXXXX.",
+        "..........",
+        ".XXXXXXXXX",
+        "..........",
+        "XXXXXXXXX.",
+        "..........",
+        ".XXXXXXXXX",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=22,
+        time_limit=55.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 6, "corn": 6, "tomato": 5, "carrot": 5},
+    ),
+    "hint": "",
+}
+ 
+# level 17 - open center ringed by obstacles with one gap at the bottom
+# farmer starts outside and must find the entry point to farm inside
+LEVEL_17 = {
+    "name": "The Moat",
+    "number": 17,
+    "grid": [
+        "F.........",
+        ".XXXXXXXX.",
+        ".X......X.",
+        ".X......X.",
+        ".X......X.",
+        ".X......X.",
+        ".X......X.",
+        ".XXXX.XXX.",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=20,
+        time_limit=50.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 5, "corn": 5, "tomato": 5, "carrot": 5},
+    ),
+    "hint": "",
+}
+ 
+# level 18 - dense alternating walls, tighter than the tunnel levels
+# requires very efficient loop logic to snake through in time
+LEVEL_18 = {
+    "name": "The Labyrinth",
+    "number": 18,
+    "grid": [
+        "F.........",
+        "XXXXXXXX..",
+        "..........",
+        "XXXXXXXXX.",
+        "..........",
+        "..XXXXXXXXX",
+        "..........",
+        "XXXXXXXXX.",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=24,
+        time_limit=45.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 6, "corn": 6, "tomato": 6, "carrot": 6},
+    ),
+    "hint": "",
+}
+ 
+# level 19 - scattered random-looking obstacle pattern across a large grid
+# lots of walkable tiles but the path is non-obvious, very tight timer
+LEVEL_19 = {
+    "name": "The Scatterplot",
+    "number": 19,
+    "grid": [
+        "F..X..X....",
+        "..X....X...",
+        "X....X....X",
+        "...X....X..",
+        "..X..X.....",
+        ".X....X..X.",
+        "....X....X.",
+        "X....X.....",
+        "..X....X..X",
+        "...X..X....",
+        "...........",
+    ],
+    "objective": Objective(
+        harvests_required=24,
+        time_limit=40.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 6, "corn": 6, "tomato": 6, "carrot": 6},
+    ),
+    "hint": "",
+}
+ 
+# level 20 - the grand finale: massive grid, heavy alternating walls,
+# extremely tight timer, requires mastery of loops and planning
+LEVEL_20 = {
+    "name": "The Ultimate Harvest",
+    "number": 20,
+    "grid": [
+        "F.........",
+        "XXXXXXXXX.",
+        "..........",
+        ".XXXXXXXX.",
+        "..........",
+        ".XXXXXXXX.",
+        "..........",
+        ".XXXXXXXXX",
+        "..........",
+        "XXXXXXXXX.",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=32,
+        time_limit=40.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 8, "corn": 8, "tomato": 8, "carrot": 8},
+    ),
+    "hint": "",
+}
+
+LEVEL_21 = {
+    "name": "The Serpentine",
+    "number": 21,
+    "grid": [
+        "F...........",
+        "XXXXXXXXXX..",
+        "............",
+        "..XXXXXXXXXX",
+        "............",
+        "XXXXXXXXXX..",
+        "............",
+        "..XXXXXXXXXX",
+        "............",
+        "XXXXXXXXXX..",
+        "............",
+    ],
+    "objective": Objective(
+        harvests_required=36,
+        time_limit=38.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 9, "corn": 9, "tomato": 9, "carrot": 9},
+    ),
+    "hint": "",
+}
+
+LEVEL_22 = {
+    "name": "The Comb",
+    "number": 22,
+    "grid": [
+        "F.........",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        ".X.X.X.X..",
+        "..........",
+    ],
+    "objective": Objective(
+        harvests_required=40,
+        time_limit=35.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 10, "corn": 10, "tomato": 10, "carrot": 10},
+    ),
+    "hint": "",
+}
+ 
+LEVEL_23 = {
+    "name": "The Double Moat",
+    "number": 23,
+    "grid": [
+        "F...........",
+        ".XXXXXXXXXX.",
+        ".X........X.",
+        ".X.XXXXXX.X.",
+        ".X.X....X.X.",
+        ".X.X....X.X.",
+        ".X.X....X.X.",
+        ".X.X....X.X.",
+        ".X.XXXX.X.X.",
+        ".X........X.",
+        ".XXXXX.XXXX.",
+        "............",
+    ],
+    "objective": Objective(
+        harvests_required=40,
+        time_limit=35.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 10, "corn": 10, "tomato": 10, "carrot": 10},
+    ),
+    "hint": "",
+}
+ 
+
+LEVEL_24 = {
+    "name": "The Pillars",
+    "number": 24,
+    "grid": [
+        "F.............",
+        "..XX...XX...XX",
+        "..XX...XX...XX",
+        "..............",
+        "....XX...XX...",
+        "....XX...XX...",
+        "..............",
+        "..XX...XX...XX",
+        "..XX...XX...XX",
+        "..............",
+        "....XX...XX...",
+        "....XX...XX...",
+        "..............",
+    ],
+    "objective": Objective(
+        harvests_required=44,
+        time_limit=32.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 11, "corn": 11, "tomato": 11, "carrot": 11},
+    ),
+    "hint": "",
+}
+ 
+
+LEVEL_25 = {
+    "name": "The Grand Finale",
+    "number": 25,
+    "grid": [
+        "F.............",
+        "XXXXXXXXXXXXX.",
+        "..............",
+        ".XXXXXXXXXXXXX",
+        "..............",
+        "XXXXXXXXXXXXX.",
+        "..............",
+        ".XXXXXXXXXXXXX",
+        "..............",
+        "XXXXXXXXXXXXX.",
+        "..............",
+        ".XXXXXXXXXXXXX",
+        "..............",
+    ],
+    "objective": Objective(
+        harvests_required=48,
+        time_limit=30.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 12, "corn": 12, "tomato": 12, "carrot": 12},
+    ),
+    "hint": "",
+}
+ 
+_ALL_LEVELS = [
+    LEVEL_1,  LEVEL_2,  LEVEL_3,  LEVEL_4,  LEVEL_5,
+    LEVEL_6,  LEVEL_7,  LEVEL_8,  LEVEL_9,  LEVEL_10,
+    LEVEL_11, LEVEL_12, LEVEL_13, LEVEL_14, LEVEL_15,
+    LEVEL_16, LEVEL_17, LEVEL_18, LEVEL_19, LEVEL_20,
+]
  
 #mapping the characters to certain crops
 _CROP_MAP: dict[str, CropType] = {
@@ -327,6 +713,7 @@ class LevelManager:
     #function to restart the level if needed, rebuilds from scratch so objective resets
     def reload(self, screen_w: int, screen_h: int) -> None:
         self.current = self._load(self._index)
+        self.current.objective.reset()  
         self.current.center_on(screen_w, screen_h)
  
     #returns true if there are no more levels after the current one
