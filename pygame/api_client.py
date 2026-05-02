@@ -5,7 +5,7 @@ _IS_BROWSER = sys.platform in ("emscripten", "wasi")
 
 # Update this to your hosted backend URL once deployed.
 # For local development the backend runs at localhost:8000.
-API_BASE = "http://localhost:8000"
+API_BASE = "https://automated-farmer.onrender.com"
 
 
 async def _post(endpoint: str, data: dict) -> dict:
@@ -34,13 +34,13 @@ async def _desktop_post(url: str, data: dict) -> dict:
 
 async def _browser_post(url: str, data: dict) -> dict:
     try:
-        import platform
-        response = await platform.window.fetch(
-            url,
-            method="POST",
-            body=json.dumps(data),
-            headers={"Content-Type": "application/json"},
+        import js
+        from pyodide.ffi import to_js
+        opts = to_js(
+            {"method": "POST", "body": json.dumps(data), "headers": {"Content-Type": "application/json"}},
+            dict_converter=js.Object.fromEntries,
         )
+        response = await js.fetch(url, opts)
         text = await response.text()
         body = json.loads(text)
         if response.status in (200, 201):
