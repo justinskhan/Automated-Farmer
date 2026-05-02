@@ -11,19 +11,25 @@ from crop import Crop, CropType
 from debug import print_grid
 from objective import ObjectiveStatus
 from overlay import Overlay
+import asyncio as _asyncio
+import api_client
+from auth_ui import AuthUI
 
+#boolean that uses emscripten and wasi which are browser platform names pygame recognizes
 _IS_BROWSER = sys.platform in ("emscripten", "wasi")
 
-pygame.init()
-pygame.key.set_repeat(400, 40)
+pygame.init() #initializes game
+pygame.key.set_repeat(400, 40) #allows for player to hold down a key and have it repeating, 400 ms intiial delay 40ms after
 
-if _IS_BROWSER:
-    # On the web, ask the browser for its actual viewport size so the canvas
-    # covers it instead of rendering as a small inner square.
+
+if _IS_BROWSER: #if browser is there
     try:
+        #platform allows us to interact with browser properties
         import platform as _plat
+        #grab viewport for the browser and store it 
         _w = int(_plat.window.innerWidth)
         _h = int(_plat.window.innerHeight)
+        #if it is too small to show then open it in 720p
         if _w < 320 or _h < 240:
             _w, _h = 1280, 720
     except Exception:
@@ -42,14 +48,20 @@ level   = manager.current
 farmer  = Farmer(level.start_tile, level.TILE_SIZE)
 farmer.snap_to_tile()
 
-background = Background(color=(173, 216, 230))
-ide        = IDE(20, 20)
-overlay    = Overlay()
+background   = Background(color=(173, 216, 230))
+ide          = IDE(20, 20)
+overlay      = Overlay()
+auth_ui      = AuthUI()
+current_user = None
+_auth_task   = None
 
 # game states
 STATE_START   = "start"
 STATE_PLAYING = "playing"
-game_state    = STATE_START
+STATE_AUTH    = "auth"
+STATE_LOGIN   = "login"
+STATE_SIGNUP  = "signup"
+game_state    = STATE_AUTH
 
 # start screen animation state
 _btn_hovered      = False
@@ -945,6 +957,7 @@ async def main():
     global _center_btn, _htp_btn, _reset_btn
     global frame_count
     global screen
+    global current_user, _auth_task
 
     while running:
         dt = clock.tick(60) / 1000.0
@@ -993,11 +1006,36 @@ async def main():
                     level.center_on(event.w, event.h)
                     farmer.snap_to_tile()
 
-            if game_state == STATE_START:
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if _current_btn_rect and _current_btn_rect.collidepoint(event.pos):
-                        game_state = STATE_PLAYING
-                        level.center_on(*screen.get_size())
+            if game_state == STATE_AUTH:
+                action = auth_ui.handle_event_auth(event)
+                if action == "login":
+                    auth_ui.reset_form()
+                    game_state = STATE_LOGIN
+                elif action == "signup":
+                    auth_ui.reset_form()
+                    game_state = STATE_SIGNUP
+                continue
+
+            if game_state in (STATE_LOGIN, STATE_SIGNUP):
+                if _auth_task is None:
+                    action = auth_ui.handle_event_form(event)
+                    if action == "back":
+                        auth_ui.reset_form()
+                        game_state = STATE_AUTH
+                    elif action == "submit":
+                        u, p = auth_ui.username, auth_ui.password
+                        if not u or not p:
+                            auth_ui.set_error("Username and password required")
+                        else:
+                            auth_ui.set_pending(True)
+                            if game_state == STATE_LOGIN:
+                                _auth_task = _asyncio.create_task(
+                                    api_client.login(u, p)
+                                )
+                            else:
+                                _auth_task = _asyncio.create_task(
+                                    api_client.signup(u, p)
+                                )
                 continue
 
             if frozen:
@@ -1069,12 +1107,37 @@ async def main():
                 except Exception as e:
                     ide.log(f"Error: {e}", error=True)
 
-        if game_state == STATE_START:
+        # Resolve pending auth API call
+        if _auth_task is not None and _auth_task.done():
+            result     = _auth_task.result()
+            _auth_task = None
+            if "error" in result:
+                auth_ui.set_error(result["error"])
+            else:
+                current_user = result
+                auth_ui.reset_form()
+                game_state = STATE_PLAYING
+                level.center_on(*screen.get_size())
+
+        if game_state == STATE_AUTH:
             _pulse_timer += dt
             pulse = (math.sin(_pulse_timer * 3) + 1) / 2
-            mouse_pos = pygame.mouse.get_pos()
-            _current_btn_rect = _draw_start_screen(screen, pulse)
-            _btn_hovered = _current_btn_rect.collidepoint(mouse_pos)
+            auth_ui.update(dt)
+            auth_ui.draw_auth_screen(screen, pulse)
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            continue
+
+        if game_state == STATE_LOGIN:
+            auth_ui.update(dt)
+            auth_ui.draw_login_form(screen)
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            continue
+
+        if game_state == STATE_SIGNUP:
+            auth_ui.update(dt)
+            auth_ui.draw_signup_form(screen)
             pygame.display.flip()
             await asyncio.sleep(0)
             continue
@@ -1121,32 +1184,37 @@ async def main():
                 _done_event.clear()
                 _step_event.set()
         else:
-            # Browser: tick the pre-recorded action queue one step per frame
+            #if user is using a browser
             if not frozen:
-                _tick_browser_actions()
+                _tick_browser_actions() #check if farmer is done moving
 
-        farmer.update(dt, level)
+        farmer.update(dt, level) #move the farmer to the right tile
         ide.update(dt)
-        level.update(dt, pygame.mouse.get_pos())
+        level.update(dt, pygame.mouse.get_pos()) #update everything in the level
 
+        #draw the environment in the following order:
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
         _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
 
+        #show the how to play screen and if it is clicked open gui
         if _show_htp_ingame:
             _htp_ingame_close, _htp_example_btns = _draw_htp_modal_ingame(screen)
         else:
             _htp_ingame_close  = None
             _htp_example_btns  = []
-
+            
+        #push the fully drawn frame to the screen
         pygame.display.flip()
 
+        #every 5 seconds print out the debug on what the grid looks like for the level
         frame_count += 1
-        if frame_count % 300 == 0:  # reduced from 30 to avoid console spam in browser
+        if frame_count % 300 == 0:  
             print_grid(level)
-
+        #this doesn't actually stop anything since it is set to 0
+        #this hands the event loop over to javascript to render canvas and process events
         await asyncio.sleep(0)
 
     _stop_user_thread()
