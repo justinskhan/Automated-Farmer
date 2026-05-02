@@ -34,18 +34,18 @@ async def _desktop_post(url: str, data: dict) -> dict:
 
 async def _browser_post(url: str, data: dict) -> dict:
     try:
-        import js
-        from pyodide.ffi import to_js
-        opts = to_js(
-            {"method": "POST", "body": json.dumps(data), "headers": {"Content-Type": "application/json"}},
-            dict_converter=js.Object.fromEntries,
+        import platform
+        body = json.dumps(data)
+        opts = platform.window.eval(
+            '({"method":"POST","body":' + json.dumps(body) +
+            ',"headers":{"Content-Type":"application/json"}})'
         )
-        response = await js.fetch(url, opts)
+        response = await platform.window.fetch(url, opts)
         text = await response.text()
-        body = json.loads(text)
+        result = json.loads(text)
         if response.status in (200, 201):
-            return body
-        return {"error": body.get("detail", "Request failed")}
+            return result
+        return {"error": result.get("detail", "Request failed")}
     except Exception as e:
         return {"error": f"Could not connect to server: {e}"}
 
