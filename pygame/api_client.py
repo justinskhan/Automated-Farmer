@@ -5,7 +5,7 @@ _IS_BROWSER = sys.platform in ("emscripten", "wasi")
 
 # Update this to your hosted backend URL once deployed.
 # For local development the backend runs at localhost:8000.
-API_BASE = "https://automated-farmer.onrender.com"
+API_BASE = "https://automated-farmer-backend.onrender.com"
 
 
 async def _post(endpoint: str, data: dict) -> dict:
