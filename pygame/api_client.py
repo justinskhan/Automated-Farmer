@@ -35,15 +35,21 @@ async def _desktop_post(url: str, data: dict) -> dict:
 async def _browser_post(url: str, data: dict) -> dict:
     try:
         import platform
-        body = json.dumps(data)
-        opts = platform.window.eval(
-            '({"method":"POST","body":' + json.dumps(body) +
-            ',"headers":{"Content-Type":"application/json"}})'
+        body_str = json.dumps(data)
+        # Single JS async IIFE: fetch + read body in one await to avoid
+        # Pygbag issues with chained sequential JavaScript Promise awaits.
+        js = (
+            "(async()=>{"
+            "const r=await fetch(" + json.dumps(url) + ","
+            "{method:'POST',body:" + json.dumps(body_str) + ","
+            "headers:{'Content-Type':'application/json'}});"
+            "return r.status+'|||'+(await r.text());"
+            "})()"
         )
-        response = await platform.window.fetch(url, opts)
-        text = await response.text()
-        result = json.loads(text)
-        if response.status in (200, 201):
+        raw = str(await platform.window.eval(js))
+        status_str, body_text = raw.split("|||", 1)
+        result = json.loads(body_text)
+        if int(status_str) in (200, 201):
             return result
         return {"error": result.get("detail", "Request failed")}
     except Exception as e:
