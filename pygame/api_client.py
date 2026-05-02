@@ -33,25 +33,52 @@ async def _desktop_post(url: str, data: dict) -> dict:
 
 
 async def _browser_post(url: str, data: dict) -> dict:
+    """
+    Browser POST using a polling pattern.
+    Pygbag's event loop does not reliably resolve JavaScript Promises back
+    to Python `await`, so we trigger the fetch in JS, write the result onto
+    `window._apResult`, and poll from Python until it becomes non-null.
+    """
     try:
         import platform
+        import asyncio
         body_str = json.dumps(data)
-        # Single JS async IIFE: fetch + read body in one await to avoid
-        # Pygbag issues with chained sequential JavaScript Promise awaits.
-        js = (
-            "(async()=>{"
-            "const r=await fetch(" + json.dumps(url) + ","
+        js_code = (
+            "window._apResult=null;"
+            "fetch(" + json.dumps(url) + ","
             "{method:'POST',body:" + json.dumps(body_str) + ","
-            "headers:{'Content-Type':'application/json'}});"
-            "return r.status+'|||'+(await r.text());"
-            "})()"
+            "headers:{'Content-Type':'application/json'}})"
+            ".then(function(r){"
+            "return r.text().then(function(t){"
+            "window._apResult={status:r.status,body:t};"
+            "});"
+            "}).catch(function(e){"
+            "window._apResult={status:0,body:String(e)};"
+            "});"
         )
-        raw = str(await platform.window.eval(js))
-        status_str, body_text = raw.split("|||", 1)
-        result = json.loads(body_text)
-        if int(status_str) in (200, 201):
+        platform.window.eval(js_code)
+        # Poll up to 30 seconds for the JS callback to set _apResult
+        res = None
+        for _ in range(600):
+            res = platform.window._apResult
+            if res is not None:
+                break
+            await asyncio.sleep(0.05)
+        if res is None:
+            return {"error": "Request timed out"}
+        status = int(res.status)
+        body_text = str(res.body)
+        if status == 0:
+            return {"error": body_text}
+        try:
+            result = json.loads(body_text)
+        except json.JSONDecodeError:
+            return {"error": f"Invalid response: {body_text[:100]}"}
+        if status in (200, 201):
             return result
-        return {"error": result.get("detail", "Request failed")}
+        if isinstance(result, dict):
+            return {"error": result.get("detail", "Request failed")}
+        return {"error": "Request failed"}
     except Exception as e:
         return {"error": f"Could not connect to server: {e}"}
 
