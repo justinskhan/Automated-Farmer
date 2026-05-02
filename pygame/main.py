@@ -54,6 +54,7 @@ overlay      = Overlay()
 auth_ui      = AuthUI()
 current_user = None
 _auth_task   = None
+_auth_creds  = None  # browser-only: (username, password, "login"|"signup")
 
 # game states
 STATE_START   = "start"
@@ -957,7 +958,7 @@ async def main():
     global _center_btn, _htp_btn, _reset_btn
     global frame_count
     global screen
-    global current_user, _auth_task
+    global current_user, _auth_task, _auth_creds
 
     while running:
         dt = clock.tick(60) / 1000.0
@@ -1028,14 +1029,12 @@ async def main():
                             auth_ui.set_error("Username and password required")
                         else:
                             auth_ui.set_pending(True)
-                            if game_state == STATE_LOGIN:
-                                _auth_task = _asyncio.create_task(
-                                    api_client.login(u, p)
-                                )
+                            if _IS_BROWSER:
+                                _auth_creds = (u, p, "login" if game_state == STATE_LOGIN else "signup")
+                            elif game_state == STATE_LOGIN:
+                                _auth_task = _asyncio.create_task(api_client.login(u, p))
                             else:
-                                _auth_task = _asyncio.create_task(
-                                    api_client.signup(u, p)
-                                )
+                                _auth_task = _asyncio.create_task(api_client.signup(u, p))
                 continue
 
             if frozen:
@@ -1128,17 +1127,24 @@ async def main():
             await asyncio.sleep(0)
             continue
 
-        if game_state == STATE_LOGIN:
+        if game_state in (STATE_LOGIN, STATE_SIGNUP):
             auth_ui.update(dt)
-            auth_ui.draw_login_form(screen)
+            if game_state == STATE_LOGIN:
+                auth_ui.draw_login_form(screen)
+            else:
+                auth_ui.draw_signup_form(screen)
             pygame.display.flip()
-            await asyncio.sleep(0)
-            continue
-
-        if game_state == STATE_SIGNUP:
-            auth_ui.update(dt)
-            auth_ui.draw_signup_form(screen)
-            pygame.display.flip()
+            if _IS_BROWSER and _auth_creds is not None:
+                u, p, mode = _auth_creds
+                _auth_creds = None
+                result = await (api_client.login(u, p) if mode == "login" else api_client.signup(u, p))
+                if "error" in result:
+                    auth_ui.set_error(result["error"])
+                else:
+                    current_user = result
+                    auth_ui.reset_form()
+                    game_state = STATE_PLAYING
+                    level.center_on(*screen.get_size())
             await asyncio.sleep(0)
             continue
 

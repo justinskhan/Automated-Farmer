@@ -66,7 +66,7 @@ class _InputField:
         pygame.draw.rect(surface, bg,  self.rect, border_radius=4)
         pygame.draw.rect(surface, bdr, self.rect, 1, border_radius=4)
 
-        display = ("●" * len(self.value)) if self.masked else self.value
+        display = ("*" * len(self.value)) if self.masked else self.value
         if self.focused and self._cursor_vis:
             display += "|"
 
