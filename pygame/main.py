@@ -22,19 +22,38 @@ pygame.init() #initializes game
 pygame.key.set_repeat(400, 40) #allows for player to hold down a key and have it repeating, 400 ms intiial delay 40ms after
 
 
+def _pin_canvas_css(_plat, css_w: int, css_h: int) -> None:
+    """Set canvas CSS display size so each pygame pixel = 1 physical screen pixel."""
+    try:
+        canvas = _plat.document.querySelector("canvas")
+        if canvas is not None:
+            canvas.style.width  = f"{css_w}px"
+            canvas.style.height = f"{css_h}px"
+    except Exception:
+        pass
+
+
 if _IS_BROWSER: #if browser is there
     try:
         #platform allows us to interact with browser properties
         import platform as _plat
-        #grab viewport for the browser and store it 
-        _w = int(_plat.window.innerWidth)
-        _h = int(_plat.window.innerHeight)
+        #devicePixelRatio: how many physical pixels per CSS pixel (e.g. 2 on Retina/4K)
+        _dpr = float(_plat.window.devicePixelRatio) or 1.0
+        #grab viewport for the browser and store it (CSS pixels)
+        _vw = int(_plat.window.innerWidth)
+        _vh = int(_plat.window.innerHeight)
         #if it is too small to show then open it in 720p
-        if _w < 320 or _h < 240:
-            _w, _h = 1280, 720
+        if _vw < 320 or _vh < 240:
+            _vw, _vh = 1280, 720
+        #pygame renders at PHYSICAL pixel resolution for crisp text
+        _w = int(_vw * _dpr)
+        _h = int(_vh * _dpr)
     except Exception:
         _w, _h = 1280, 720
+        _vw, _vh = 1280, 720
+        _dpr = 1.0
     screen = pygame.display.set_mode((_w, _h), pygame.RESIZABLE)
+    _pin_canvas_css(_plat, _vw, _vh)
 else:
     screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 
@@ -969,20 +988,24 @@ async def main():
         if _IS_BROWSER:
             try:
                 import platform as _plat
+                dpr = float(_plat.window.devicePixelRatio) or 1.0
                 vw = int(_plat.window.innerWidth)
                 vh = int(_plat.window.innerHeight)
+                target_w = int(vw * dpr)
+                target_h = int(vh * dpr)
                 cw, ch = screen.get_size()
-                if vw > 0 and vh > 0 and (vw != cw or vh != ch):
+                if vw > 0 and vh > 0 and (target_w != cw or target_h != ch):
                     old_w, old_h = cw, ch
-                    screen = pygame.display.set_mode((vw, vh), pygame.RESIZABLE)
+                    screen = pygame.display.set_mode((target_w, target_h), pygame.RESIZABLE)
+                    _pin_canvas_css(_plat, vw, vh)
                     if game_state == STATE_PLAYING and old_w > 0 and old_h > 0:
-                        sx = vw / old_w
-                        sy = vh / old_h
+                        sx = target_w / old_w
+                        sy = target_h / old_h
                         ide.rect.x      = int(ide.rect.x      * sx)
                         ide.rect.y      = int(ide.rect.y      * sy)
                         ide.rect.width  = max(200, int(ide.rect.width  * sx))
                         ide.rect.height = max(120, int(ide.rect.height * sy))
-                    level.center_on(vw, vh)
+                    level.center_on(target_w, target_h)
                     farmer.snap_to_tile()
             except Exception:
                 pass
