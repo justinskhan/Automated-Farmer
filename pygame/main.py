@@ -996,16 +996,11 @@ async def main():
                 target_h = int(vh * dpr)
                 cw, ch = screen.get_size()
                 if vw > 0 and vh > 0 and (target_w != cw or target_h != ch):
-                    old_w, old_h = cw, ch
                     screen = pygame.display.set_mode((target_w, target_h), pygame.RESIZABLE)
                     _pin_canvas_css(_plat, vw, vh)
-                    if game_state == STATE_PLAYING and old_w > 0 and old_h > 0:
-                        sx = target_w / old_w
-                        sy = target_h / old_h
-                        ide.rect.x      = int(ide.rect.x      * sx)
-                        ide.rect.y      = int(ide.rect.y      * sy)
-                        ide.rect.width  = max(200, int(ide.rect.width  * sx))
-                        ide.rect.height = max(120, int(ide.rect.height * sy))
+                    # IDE rect intentionally left untouched on resize — auto-scaling
+                    # caused drift due to min-size clamping on shrink, then unclamped
+                    # multiplication on grow. User can resize via the grip handle.
                     level.center_on(target_w, target_h)
                     farmer.snap_to_tile()
             except Exception:
@@ -1016,20 +1011,10 @@ async def main():
                 running = False
 
             elif event.type == pygame.VIDEORESIZE:
-                old_w, old_h = screen.get_size()
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-                if game_state == STATE_PLAYING and old_w > 0 and old_h > 0:
-                    sx = event.w / old_w
-                    sy = event.h / old_h
-                    ide.rect.x      = int(ide.rect.x      * sx)
-                    ide.rect.y      = int(ide.rect.y      * sy)
-                    ide.rect.width  = max(200, int(ide.rect.width  * sx))
-                    ide.rect.height = max(120, int(ide.rect.height * sy))
-                    level.center_on(event.w, event.h)
-                    farmer.snap_to_tile()
-                else:
-                    level.center_on(event.w, event.h)
-                    farmer.snap_to_tile()
+                # IDE rect intentionally left untouched — see comment in browser path.
+                level.center_on(event.w, event.h)
+                farmer.snap_to_tile()
 
             if game_state == STATE_AUTH:
                 action = auth_ui.handle_event_auth(event)

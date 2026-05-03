@@ -14,7 +14,7 @@ the whole browser window, and the original logical layout was sized for a
 import sys
 
 _SCALE: float | None = None
-_BROWSER_BOOST = 2.0  # multiplier applied on top of DPR in browser
+_BROWSER_BOOST = 1.5  # multiplier applied on top of DPR in browser
 
 
 def get_scale() -> float:
