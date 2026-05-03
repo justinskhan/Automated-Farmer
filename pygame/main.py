@@ -14,6 +14,7 @@ from overlay import Overlay
 import asyncio as _asyncio
 import api_client
 from auth_ui import AuthUI
+from ui_scale import s as _s
 
 #boolean that uses emscripten and wasi which are browser platform names pygame recognizes
 _IS_BROWSER = sys.platform in ("emscripten", "wasi")
@@ -151,20 +152,20 @@ def _draw_ide_preview(surface: pygame.Surface, x: int, y: int, w: int, lines: li
     KEYWORD     = (197, 134, 192)
     STRING      = (206, 145, 120)
 
-    TITLE_H  = 22
-    LINE_H   = 17
-    PADDING  = 5
-    NUM_W    = 26
-    font     = pygame.font.SysFont("Consolas", 13)
-    font_sm  = pygame.font.SysFont("Consolas", 11)
+    TITLE_H  = _s(22)
+    LINE_H   = _s(17)
+    PADDING  = _s(5)
+    NUM_W    = _s(26)
+    font     = pygame.font.SysFont("Consolas", _s(13))
+    font_sm  = pygame.font.SysFont("Consolas", _s(11))
 
     h = TITLE_H + PADDING + len(lines) * LINE_H + PADDING
 
-    pygame.draw.rect(surface, BG, pygame.Rect(x, y, w, h), border_radius=5)
-    pygame.draw.rect(surface, BORDER, pygame.Rect(x, y, w, h), 1, border_radius=5)
+    pygame.draw.rect(surface, BG, pygame.Rect(x, y, w, h), border_radius=_s(5))
+    pygame.draw.rect(surface, BORDER, pygame.Rect(x, y, w, h), _s(1), border_radius=_s(5))
 
     pygame.draw.rect(surface, TITLE_BG, pygame.Rect(x, y, w, TITLE_H),
-                     border_top_left_radius=5, border_top_right_radius=5)
+                     border_top_left_radius=_s(5), border_top_right_radius=_s(5))
     lbl = font_sm.render("  </> Example", True, (160, 160, 200))
     surface.blit(lbl, (x + PADDING, y + (TITLE_H - lbl.get_height()) // 2))
 
@@ -302,37 +303,37 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
     backdrop.fill((0, 0, 0, 170))
     surface.blit(backdrop, (0, 0))
 
-    mw = 560
-    mh = min(520, sh - 40)
+    mw = _s(560)
+    mh = min(_s(520), sh - _s(40))
     mx = (sw - mw) // 2
     my = (sh - mh) // 2
 
-    HEADER_H    = 50
-    SCROLLBAR_W = 10
-    CONTENT_X   = mx + 16
-    CONTENT_W   = mw - 32 - SCROLLBAR_W
+    HEADER_H    = _s(50)
+    SCROLLBAR_W = _s(10)
+    CONTENT_X   = mx + _s(16)
+    CONTENT_W   = mw - _s(32) - SCROLLBAR_W
 
-    font_section = pygame.font.SysFont("Consolas", 14, bold=True)
-    font_sub     = pygame.font.SysFont("Consolas", 13, bold=True)
-    font_code    = pygame.font.SysFont("Consolas", 13)
-    font_body    = pygame.font.SysFont("Consolas", 13)
-    font_desc    = pygame.font.SysFont("Consolas", 11)
-    font_locked  = pygame.font.SysFont("Consolas", 13)
-    font_btn     = pygame.font.SysFont("Consolas", 11, bold=True)
+    font_section = pygame.font.SysFont("Consolas", _s(14), bold=True)
+    font_sub     = pygame.font.SysFont("Consolas", _s(13), bold=True)
+    font_code    = pygame.font.SysFont("Consolas", _s(13))
+    font_body    = pygame.font.SysFont("Consolas", _s(13))
+    font_desc    = pygame.font.SysFont("Consolas", _s(11))
+    font_locked  = pygame.font.SysFont("Consolas", _s(13))
+    font_btn     = pygame.font.SysFont("Consolas", _s(11), bold=True)
 
     ROW_H = {
-        "section":        26,
-        "sub":            22,
-        "code":           18,
-        "desc":           16,
-        "body":           18,
-        "locked":         18,
-        "locked_example": 18,
+        "section":        _s(26),
+        "sub":            _s(22),
+        "code":           _s(18),
+        "desc":           _s(16),
+        "body":           _s(18),
+        "locked":         _s(18),
+        "locked_example": _s(18),
     }
 
-    PREVIEW_TITLE_H = 22
-    PREVIEW_PADDING = 5
-    PREVIEW_LINE_H  = 17
+    PREVIEW_TITLE_H = _s(22)
+    PREVIEW_PADDING = _s(5)
+    PREVIEW_LINE_H  = _s(17)
 
     def _preview_h(key: str) -> int:
         lines = _EXAMPLE_CODE.get(key, [])
@@ -435,11 +436,11 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
     panel.fill((20, 28, 18, 245))
     surface.blit(panel, (mx, my))
 
-    pygame.draw.rect(surface, (60, 140, 60), pygame.Rect(mx, my, mw, mh), 2, border_radius=6)
+    pygame.draw.rect(surface, (60, 140, 60), pygame.Rect(mx, my, mw, mh), _s(2), border_radius=_s(6))
 
-    font_title = pygame.font.SysFont("Consolas", 20, bold=True)
+    font_title = pygame.font.SysFont("Consolas", _s(20), bold=True)
     title_surf = font_title.render("How to Play", True, (160, 230, 120))
-    surface.blit(title_surf, (mx + 16, my + 14))
+    surface.blit(title_surf, (mx + _s(16), my + _s(14)))
 
     pygame.draw.line(surface, (60, 120, 60),
                      (mx + 8,      my + HEADER_H - 4),
@@ -473,23 +474,23 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
         pygame.draw.rect(surface, (40, 50, 40), pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h), border_radius=4)
         pygame.draw.rect(surface, (90, 160, 80), pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h), border_radius=4)
 
-    close_size    = 28
-    cx_btn        = mx + mw - close_size - 6
-    cy_btn        = my + 6
+    close_size    = _s(28)
+    cx_btn        = mx + mw - close_size - _s(6)
+    cy_btn        = my + _s(6)
     close_rect    = pygame.Rect(cx_btn, cy_btn, close_size, close_size)
     close_hovered = close_rect.collidepoint(pygame.mouse.get_pos())
 
     close_col = (200, 60, 60) if close_hovered else (140, 40, 40)
-    pygame.draw.rect(surface, close_col, close_rect, border_radius=4)
-    pygame.draw.rect(surface, (220, 80, 80), close_rect, 1, border_radius=4)
+    pygame.draw.rect(surface, close_col, close_rect, border_radius=_s(4))
+    pygame.draw.rect(surface, (220, 80, 80), close_rect, _s(1), border_radius=_s(4))
 
     cx_center = cx_btn + close_size // 2
     cy_center = cy_btn + close_size // 2
-    pad = 7
+    pad = _s(7)
     pygame.draw.line(surface, (255, 255, 255),
-                     (cx_center - pad, cy_center - pad), (cx_center + pad, cy_center + pad), 2)
+                     (cx_center - pad, cy_center - pad), (cx_center + pad, cy_center + pad), _s(2))
     pygame.draw.line(surface, (255, 255, 255),
-                     (cx_center + pad, cy_center - pad), (cx_center - pad, cy_center + pad), 2)
+                     (cx_center + pad, cy_center - pad), (cx_center - pad, cy_center + pad), _s(2))
 
     example_btns_screen = []
     for key, cs_rect in example_btns_content:
@@ -509,53 +510,53 @@ def _draw_start_screen(surface: pygame.Surface, pulse: float) -> pygame.Rect:
 
     surface.fill((173, 216, 230))
 
-    panel_w = 520
-    panel_h = 280
+    panel_w = _s(520)
+    panel_h = _s(280)
     panel_x = (sw - panel_w) // 2
-    panel_y = (sh - panel_h) // 2 - 20
+    panel_y = (sh - panel_h) // 2 - _s(20)
     panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
     panel_surf.fill((15, 15, 25, 210))
     surface.blit(panel_surf, (panel_x, panel_y))
 
-    font_sub = pygame.font.SysFont("Consolas", 15)
+    font_sub = pygame.font.SysFont("Consolas", _s(15))
     sub_surf = font_sub.render("< Learn to code through farming />", True, (100, 180, 100))
-    surface.blit(sub_surf, (sw // 2 - sub_surf.get_width() // 2, panel_y + 28))
+    surface.blit(sub_surf, (sw // 2 - sub_surf.get_width() // 2, panel_y + _s(28)))
 
-    font_title  = pygame.font.SysFont("Consolas", 52, bold=True)
+    font_title  = pygame.font.SysFont("Consolas", _s(52), bold=True)
     title_surf  = font_title.render("Automated", True, (220, 240, 200))
     title2_surf = font_title.render("Farmer",    True, (160, 210, 120))
-    surface.blit(title_surf,  (sw // 2 - title_surf.get_width()  // 2, panel_y + 60))
-    surface.blit(title2_surf, (sw // 2 - title2_surf.get_width() // 2, panel_y + 118))
+    surface.blit(title_surf,  (sw // 2 - title_surf.get_width()  // 2, panel_y + _s(60)))
+    surface.blit(title2_surf, (sw // 2 - title2_surf.get_width() // 2, panel_y + _s(118)))
 
     icons = [
-        ((sw // 2 - 90, panel_y + 195), (210, 180, 50),  "sq"),
-        ((sw // 2 - 40, panel_y + 195), (255, 220,  0),  "ci"),
-        ((sw // 2 + 10, panel_y + 195), (220,  50, 50),  "ci"),
-        ((sw // 2 + 60, panel_y + 195), (230, 120, 20),  "tr"),
+        ((sw // 2 - _s(90), panel_y + _s(195)), (210, 180, 50),  "sq"),
+        ((sw // 2 - _s(40), panel_y + _s(195)), (255, 220,  0),  "ci"),
+        ((sw // 2 + _s(10), panel_y + _s(195)), (220,  50, 50),  "ci"),
+        ((sw // 2 + _s(60), panel_y + _s(195)), (230, 120, 20),  "tr"),
     ]
     for (ix, iy), col, shape in icons:
         if shape == "sq":
-            pygame.draw.rect(surface, col, pygame.Rect(ix - 10, iy - 10, 20, 20), border_radius=3)
-            pygame.draw.rect(surface, (0, 0, 0), pygame.Rect(ix - 10, iy - 10, 20, 20), 1, border_radius=3)
+            pygame.draw.rect(surface, col, pygame.Rect(ix - _s(10), iy - _s(10), _s(20), _s(20)), border_radius=_s(3))
+            pygame.draw.rect(surface, (0, 0, 0), pygame.Rect(ix - _s(10), iy - _s(10), _s(20), _s(20)), _s(1), border_radius=_s(3))
         elif shape == "ci":
-            pygame.draw.circle(surface, col, (ix, iy), 10)
-            pygame.draw.circle(surface, (0, 0, 0), (ix, iy), 10, 1)
+            pygame.draw.circle(surface, col, (ix, iy), _s(10))
+            pygame.draw.circle(surface, (0, 0, 0), (ix, iy), _s(10), _s(1))
         elif shape == "tr":
-            pts = [(ix, iy - 11), (ix - 10, iy + 9), (ix + 10, iy + 9)]
+            pts = [(ix, iy - _s(11)), (ix - _s(10), iy + _s(9)), (ix + _s(10), iy + _s(9))]
             pygame.draw.polygon(surface, col, pts)
-            pygame.draw.polygon(surface, (0, 0, 0), pts, 1)
+            pygame.draw.polygon(surface, (0, 0, 0), pts, _s(1))
 
-    btn_w    = int(160 + pulse * 6)
-    btn_h    = int(48  + pulse * 3)
+    btn_w    = int(_s(160) + pulse * _s(6))
+    btn_h    = int(_s(48)  + pulse * _s(3))
     btn_x    = sw // 2 - btn_w // 2
-    btn_y    = panel_y + panel_h + 30
+    btn_y    = panel_y + panel_h + _s(30)
     btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
     btn_color = (70, 210, 100) if _btn_hovered else (50, 180, 80)
-    pygame.draw.rect(surface, btn_color, btn_rect, border_radius=6)
-    pygame.draw.rect(surface, (30, 100, 50), btn_rect, 2, border_radius=6)
+    pygame.draw.rect(surface, btn_color, btn_rect, border_radius=_s(6))
+    pygame.draw.rect(surface, (30, 100, 50), btn_rect, _s(2), border_radius=_s(6))
 
-    font_btn  = pygame.font.SysFont("Consolas", 20, bold=True)
+    font_btn  = pygame.font.SysFont("Consolas", _s(20), bold=True)
     btn_label = font_btn.render("PLAY", True, (255, 255, 255))
     surface.blit(btn_label, (sw // 2 - btn_label.get_width() // 2,
                               btn_y + btn_h // 2 - btn_label.get_height() // 2))
@@ -827,14 +828,14 @@ def _check_forbidden_constructs(tree: ast.AST):
 
 def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     obj        = lv.objective
-    font_title = pygame.font.SysFont("Consolas", 16, bold=True)
-    font_body  = pygame.font.SysFont("Consolas", 14)
-    font_time  = pygame.font.SysFont("Consolas", 22, bold=True)
-    font_label = pygame.font.SysFont("Consolas", 11)
+    font_title = pygame.font.SysFont("Consolas", _s(16), bold=True)
+    font_body  = pygame.font.SysFont("Consolas", _s(14))
+    font_time  = pygame.font.SysFont("Consolas", _s(22), bold=True)
+    font_label = pygame.font.SysFont("Consolas", _s(11))
 
-    padding = 10
-    line_h  = 20
-    margin  = 12
+    padding = _s(10)
+    line_h  = _s(20)
+    margin  = _s(12)
 
     if obj.has_crop_requirements:
         obj_lines = [f"Level {lv.number}: {lv.name}"]
@@ -857,7 +858,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(panel_surf, (sx, sy))
 
     pygame.draw.rect(surface, (80, 80, 110),
-                     pygame.Rect(sx, sy, panel_w, panel_h), 1, border_radius=4)
+                     pygame.Rect(sx, sy, panel_w, panel_h), _s(1), border_radius=_s(4))
 
     surface.blit(font_title.render(obj_lines[0], True, (220, 220, 255)),
                  (sx + padding, sy + padding))
@@ -867,9 +868,9 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
                      (sx + padding, sy + padding + line_h * (i + 1)))
 
     time_box_w = panel_w
-    time_box_h = 54
+    time_box_h = _s(54)
     tx = sx
-    ty = sy + panel_h + 6
+    ty = sy + panel_h + _s(6)
 
     t = obj.time_remaining
     if t is None:
@@ -889,20 +890,20 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(time_surf, (tx, ty))
 
     pygame.draw.rect(surface, (80, 80, 110),
-                     pygame.Rect(tx, ty, time_box_w, time_box_h), 1, border_radius=4)
+                     pygame.Rect(tx, ty, time_box_w, time_box_h), _s(1), border_radius=_s(4))
 
     label_surf = font_label.render("TIME LEFT", True, (120, 120, 160))
-    surface.blit(label_surf, (tx + padding, ty + 6))
+    surface.blit(label_surf, (tx + padding, ty + _s(6)))
 
     time_render = font_time.render(time_str, True, time_col)
     time_x = tx + (time_box_w - time_render.get_width()) // 2
-    time_y = ty + time_box_h - time_render.get_height() - 6
+    time_y = ty + time_box_h - time_render.get_height() - _s(6)
     surface.blit(time_render, (time_x, time_y))
 
     btn_w = time_box_w
     btn_h = time_box_h
     bx    = tx
-    by    = ty + time_box_h + 6
+    by    = ty + time_box_h + _s(6)
 
     center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
     btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())
@@ -912,9 +913,9 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     btn_bg.fill(btn_bg_col)
     surface.blit(btn_bg, (bx, by))
 
-    pygame.draw.rect(surface, (80, 80, 110), center_btn_rect, 1, border_radius=4)
+    pygame.draw.rect(surface, (80, 80, 110), center_btn_rect, _s(1), border_radius=_s(4))
 
-    font_btn = pygame.font.SysFont("Consolas", 14, bold=True)
+    font_btn = pygame.font.SysFont("Consolas", _s(14), bold=True)
     lbl = font_btn.render("Center IDE", True, (255, 255, 255))
     surface.blit(lbl, (bx + (btn_w - lbl.get_width()) // 2,
                         by + (btn_h - lbl.get_height()) // 2))
@@ -922,7 +923,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     htp_w = btn_w
     htp_h = btn_h
     hx    = bx
-    hy    = by + btn_h + 6
+    hy    = by + btn_h + _s(6)
 
     htp_btn_rect = pygame.Rect(hx, hy, htp_w, htp_h)
     htp_hovered  = htp_btn_rect.collidepoint(pygame.mouse.get_pos())
@@ -932,24 +933,24 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     htp_bg.fill(htp_bg_col)
     surface.blit(htp_bg, (hx, hy))
 
-    pygame.draw.rect(surface, (80, 80, 110), htp_btn_rect, 1, border_radius=4)
+    pygame.draw.rect(surface, (80, 80, 110), htp_btn_rect, _s(1), border_radius=_s(4))
 
-    font_htp = pygame.font.SysFont("Consolas", 14, bold=True)
+    font_htp = pygame.font.SysFont("Consolas", _s(14), bold=True)
     htp_lbl  = font_htp.render("How to Play", True, (255, 255, 255))
     surface.blit(htp_lbl, (hx + (htp_w - htp_lbl.get_width())  // 2,
                              hy + (htp_h - htp_lbl.get_height()) // 2))
 
-    reset_btn_rect = pygame.Rect(hx, hy + htp_h + 6, htp_w, htp_h)
+    reset_btn_rect = pygame.Rect(hx, hy + htp_h + _s(6), htp_w, htp_h)
     reset_hovered  = reset_btn_rect.collidepoint(pygame.mouse.get_pos())
 
     reset_bg_col = (60, 20, 20, 210) if reset_hovered else (35, 15, 15, 190)
     reset_bg = pygame.Surface((htp_w, htp_h), pygame.SRCALPHA)
     reset_bg.fill(reset_bg_col)
-    surface.blit(reset_bg, (hx, hy + htp_h + 6))
+    surface.blit(reset_bg, (hx, hy + htp_h + _s(6)))
 
-    pygame.draw.rect(surface, (120, 50, 50), reset_btn_rect, 1, border_radius=4)
+    pygame.draw.rect(surface, (120, 50, 50), reset_btn_rect, _s(1), border_radius=_s(4))
 
-    font_reset = pygame.font.SysFont("Consolas", 14, bold=True)
+    font_reset = pygame.font.SysFont("Consolas", _s(14), bold=True)
     reset_lbl  = font_reset.render("Reset Level", True, (255, 120, 120))
     surface.blit(reset_lbl, (reset_btn_rect.x + (htp_w - reset_lbl.get_width())  // 2,
                               reset_btn_rect.y + (htp_h - reset_lbl.get_height()) // 2))

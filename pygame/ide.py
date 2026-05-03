@@ -1,5 +1,6 @@
 import pygame
 import sys
+from ui_scale import s as _s
  
 # pygame.scrap (clipboard) is not supported in pygbag/WASM — calling init()
 # in that environment raises pygame.error and kills the async task, which
@@ -71,16 +72,16 @@ _TIMER_WARN  = (230, 180,  50)   #yellow when under 20 seconds
 _TIMER_CRIT  = (220,  80,  80)   #red when under 10 seconds
 _SELECT_BG   = ( 70, 130, 180,  80)  #selection highlight color
  
-_FONT_SIZE   = 14
-_TITLE_H     = 28
-_PADDING     = 6
-_LINE_H      = 18
-_LINE_NUM_W  = 28
-_RUN_BTN_SZ  = 20
-_GRIP_SIZE   = 14
-_MIN_W       = 200
-_MIN_H       = 120
-_OUTPUT_H    = 60
+_FONT_SIZE   = _s(14)
+_TITLE_H     = _s(28)
+_PADDING     = _s(6)
+_LINE_H      = _s(18)
+_LINE_NUM_W  = _s(28)
+_RUN_BTN_SZ  = _s(20)
+_GRIP_SIZE   = _s(14)
+_MIN_W       = _s(200)
+_MIN_H       = _s(120)
+_OUTPUT_H    = _s(60)
  
 # KMOD_CTRL covers Ctrl on Windows/Linux and the browser.
 # KMOD_META covers Cmd on macOS.
@@ -91,10 +92,12 @@ _CTRL_OR_CMD = pygame.KMOD_CTRL | pygame.KMOD_META
 #Setting an IDE window that mimics vscode that has a run button and is resizable  
 class IDE:
     #default height and width
-    WIDTH  = 420
-    HEIGHT = 260
- 
-    def __init__(self, x: int = 20, y: int = 20):
+    WIDTH  = _s(420)
+    HEIGHT = _s(260)
+
+    def __init__(self, x: int = None, y: int = None):
+        if x is None: x = _s(20)
+        if y is None: y = _s(20)
         #creates a rectangle with the default height and width
         self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
         #lines will start with one empty line

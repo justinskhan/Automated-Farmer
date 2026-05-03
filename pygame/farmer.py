@@ -1,5 +1,6 @@
 import pygame
 from typing import TYPE_CHECKING
+from ui_scale import s as _s
 if TYPE_CHECKING:
     from tile import Tile
     from level import Level
@@ -21,7 +22,7 @@ _MOVE_COOLDOWN = 0.18
 
 # farmer only moves via the in-game IDE, not keyboard input
 class Farmer:
-    SPEED = 300  # pixels per second for smooth glide
+    SPEED = _s(300)  # pixels per second for smooth glide (DPR-scaled)
 
     # initializing the farmer
     def __init__(self, start_tile: "Tile", tile_size: int):

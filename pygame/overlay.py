@@ -1,6 +1,7 @@
 from __future__ import annotations
 import pygame
 from objective import ObjectiveStatus
+from ui_scale import s as _s
  
  
 #colors for the overlay panel and buttons
@@ -16,9 +17,9 @@ _BTN_FAIL_HOVER  = (180,  80,  80)
 _BTN_TEXT        = (255, 255, 255)
  
 #font sizes for the overlay
-_FONT_TITLE_SIZE = 32
-_FONT_BODY_SIZE  = 20
-_FONT_BTN_SIZE   = 18
+_FONT_TITLE_SIZE = _s(32)
+_FONT_BODY_SIZE  = _s(20)
+_FONT_BTN_SIZE   = _s(18)
  
  
 #this class draws the win or fail screen that freezes the game
@@ -72,29 +73,29 @@ class Overlay:
         surface.blit(backdrop, (0, 0))
  
         #draw the centered panel box
-        pw, ph = 420, 280
+        pw, ph = _s(420), _s(280)
         px, py = (sw - pw) // 2, (sh - ph) // 2
         panel = pygame.Rect(px, py, pw, ph)
-        pygame.draw.rect(surface, (20, 20, 30), panel, border_radius=12)
-        pygame.draw.rect(surface, (80, 80, 110), panel, 2, border_radius=12)
+        pygame.draw.rect(surface, (20, 20, 30), panel, border_radius=_s(12))
+        pygame.draw.rect(surface, (80, 80, 110), panel, _s(2), border_radius=_s(12))
  
         #clip everything so nothing renders outside the panel
         old_clip = surface.get_clip()
         surface.set_clip(panel)
  
-        y = py + 20
+        y = py + _s(20)
  
         #draw the title text
         title_text = "Level Complete!" if is_win else "Time's Up!"
         title_color = _TITLE_WIN if is_win else _TITLE_FAIL
         title_surf = title_font.render(title_text, True, title_color)
         surface.blit(title_surf, (px + (pw - title_surf.get_width()) // 2, y))
-        y += title_surf.get_height() + 12
+        y += title_surf.get_height() + _s(12)
  
         #draw the level name below the title
         name_surf = body_font.render(level_name, True, _BODY_TEXT)
         surface.blit(name_surf, (px + (pw - name_surf.get_width()) // 2, y))
-        y += name_surf.get_height() + 16
+        y += name_surf.get_height() + _s(16)
  
         #draw harvest count and optional time used stats
         stats = [f"Crops harvested: {harvests_done} / {harvests_required}"]
@@ -103,15 +104,15 @@ class Overlay:
         for line in stats:
             s = body_font.render(line, True, _BODY_TEXT)
             surface.blit(s, (px + (pw - s.get_width()) // 2, y))
-            y += s.get_height() + 6
+            y += s.get_height() + _s(6)
  
-        y += 10
+        y += _s(10)
  
         #draw the next level or retry button
         btn_label = "Next Level" if is_win else "Retry"
         btn_surf = btn_font.render(btn_label, True, _BTN_TEXT)
-        bw = btn_surf.get_width() + 40
-        bh = btn_surf.get_height() + 14
+        bw = btn_surf.get_width() + _s(40)
+        bh = btn_surf.get_height() + _s(14)
         bx = px + (pw - bw) // 2
         by = y
  
@@ -120,7 +121,7 @@ class Overlay:
         base = _BTN_COLOR if is_win else _BTN_FAIL_COLOR
         hov  = _BTN_HOVER if is_win else _BTN_FAIL_HOVER
         pygame.draw.rect(surface, hov if self._hovered else base,
-                         self._btn_rect, border_radius=6)
-        surface.blit(btn_surf, (bx + 20, by + 7))
+                         self._btn_rect, border_radius=_s(6))
+        surface.blit(btn_surf, (bx + _s(20), by + _s(7)))
  
         surface.set_clip(old_clip)

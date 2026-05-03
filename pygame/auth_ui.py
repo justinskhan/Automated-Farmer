@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 import pygame
+from ui_scale import s as _s
 
 _PANEL_BG           = ( 15,  15,  25, 210)
 _BORDER             = ( 80,  80, 110)
@@ -52,26 +53,26 @@ class _InputField:
                 self.value += event.unicode
 
     def draw(self, surface: pygame.Surface, x: int, y: int, w: int) -> None:
-        font_label = pygame.font.SysFont("Consolas", 13)
-        font_text  = pygame.font.SysFont("Consolas", 16)
+        font_label = pygame.font.SysFont("Consolas", _s(13))
+        font_text  = pygame.font.SysFont("Consolas", _s(16))
 
-        h         = 38
+        h         = _s(38)
         self.rect = pygame.Rect(x, y, w, h)
 
         lbl = font_label.render(self.label, True, _LABEL_COLOR)
-        surface.blit(lbl, (x, y - lbl.get_height() - 4))
+        surface.blit(lbl, (x, y - lbl.get_height() - _s(4)))
 
         bg  = _INPUT_FOCUS_BG if self.focused else _INPUT_BG
         bdr = _INPUT_BORDER_FOCUS if self.focused else _INPUT_BORDER
-        pygame.draw.rect(surface, bg,  self.rect, border_radius=4)
-        pygame.draw.rect(surface, bdr, self.rect, 1, border_radius=4)
+        pygame.draw.rect(surface, bg,  self.rect, border_radius=_s(4))
+        pygame.draw.rect(surface, bdr, self.rect, _s(1), border_radius=_s(4))
 
         display = ("*" * len(self.value)) if self.masked else self.value
         if self.focused and self._cursor_vis:
             display += "|"
 
         txt = font_text.render(display, True, _TEXT_COLOR)
-        surface.blit(txt, (x + 10, y + (h - txt.get_height()) // 2))
+        surface.blit(txt, (x + _s(10), y + (h - txt.get_height()) // 2))
 
 
 class AuthUI:
@@ -183,66 +184,66 @@ class AuthUI:
         sw, sh = surface.get_size()
         surface.fill((173, 216, 230))
 
-        panel_w = 520
-        panel_h = 300
+        panel_w = _s(520)
+        panel_h = _s(300)
         panel_x = (sw - panel_w) // 2
-        panel_y = (sh - panel_h) // 2 - 30
+        panel_y = (sh - panel_h) // 2 - _s(30)
 
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel_surf.fill(_PANEL_BG)
         surface.blit(panel_surf, (panel_x, panel_y))
 
-        font_sub  = pygame.font.SysFont("Consolas", 15)
-        font_big  = pygame.font.SysFont("Consolas", 52, bold=True)
+        font_sub  = pygame.font.SysFont("Consolas", _s(15))
+        font_big  = pygame.font.SysFont("Consolas", _s(52), bold=True)
 
         sub = font_sub.render("< Learn to code through farming />", True, _SUBTITLE_COLOR)
-        surface.blit(sub, (sw // 2 - sub.get_width() // 2, panel_y + 28))
+        surface.blit(sub, (sw // 2 - sub.get_width() // 2, panel_y + _s(28)))
 
         t1 = font_big.render("Automated", True, (220, 240, 200))
         t2 = font_big.render("Farmer",    True, (160, 210, 120))
-        surface.blit(t1, (sw // 2 - t1.get_width() // 2, panel_y + 64))
-        surface.blit(t2, (sw // 2 - t2.get_width() // 2, panel_y + 124))
+        surface.blit(t1, (sw // 2 - t1.get_width() // 2, panel_y + _s(64)))
+        surface.blit(t2, (sw // 2 - t2.get_width() // 2, panel_y + _s(124)))
 
         icons = [
-            ((sw // 2 - 90, panel_y + 220), (210, 180,  50), "sq"),
-            ((sw // 2 - 40, panel_y + 220), (255, 220,   0), "ci"),
-            ((sw // 2 + 10, panel_y + 220), (220,  50,  50), "ci"),
-            ((sw // 2 + 60, panel_y + 220), (230, 120,  20), "tr"),
+            ((sw // 2 - _s(90), panel_y + _s(220)), (210, 180,  50), "sq"),
+            ((sw // 2 - _s(40), panel_y + _s(220)), (255, 220,   0), "ci"),
+            ((sw // 2 + _s(10), panel_y + _s(220)), (220,  50,  50), "ci"),
+            ((sw // 2 + _s(60), panel_y + _s(220)), (230, 120,  20), "tr"),
         ]
         for (ix, iy), col, shape in icons:
             if shape == "sq":
-                pygame.draw.rect(surface, col, pygame.Rect(ix - 10, iy - 10, 20, 20), border_radius=3)
-                pygame.draw.rect(surface, (0, 0, 0), pygame.Rect(ix - 10, iy - 10, 20, 20), 1, border_radius=3)
+                pygame.draw.rect(surface, col, pygame.Rect(ix - _s(10), iy - _s(10), _s(20), _s(20)), border_radius=_s(3))
+                pygame.draw.rect(surface, (0, 0, 0), pygame.Rect(ix - _s(10), iy - _s(10), _s(20), _s(20)), _s(1), border_radius=_s(3))
             elif shape == "ci":
-                pygame.draw.circle(surface, col, (ix, iy), 10)
-                pygame.draw.circle(surface, (0, 0, 0), (ix, iy), 10, 1)
+                pygame.draw.circle(surface, col, (ix, iy), _s(10))
+                pygame.draw.circle(surface, (0, 0, 0), (ix, iy), _s(10), _s(1))
             elif shape == "tr":
-                pts = [(ix, iy - 11), (ix - 10, iy + 9), (ix + 10, iy + 9)]
+                pts = [(ix, iy - _s(11)), (ix - _s(10), iy + _s(9)), (ix + _s(10), iy + _s(9))]
                 pygame.draw.polygon(surface, col, pts)
-                pygame.draw.polygon(surface, (0, 0, 0), pts, 1)
+                pygame.draw.polygon(surface, (0, 0, 0), pts, _s(1))
 
-        btn_w = int(150 + pulse * 5)
-        btn_h = int(48  + pulse * 2)
-        gap   = 20
+        btn_w = int(_s(150) + pulse * _s(5))
+        btn_h = int(_s(48)  + pulse * _s(2))
+        gap   = _s(20)
         total = btn_w * 2 + gap
         bx    = sw // 2 - total // 2
-        by    = panel_y + panel_h + 24
+        by    = panel_y + panel_h + _s(24)
         mouse = pygame.mouse.get_pos()
 
-        font_btn = pygame.font.SysFont("Consolas", 18, bold=True)
+        font_btn = pygame.font.SysFont("Consolas", _s(18), bold=True)
 
         self._btn_login_rect = pygame.Rect(bx, by, btn_w, btn_h)
         login_col = _BTN_GREEN_HOVER if self._btn_login_rect.collidepoint(mouse) else _BTN_GREEN
-        pygame.draw.rect(surface, login_col, self._btn_login_rect, border_radius=6)
-        pygame.draw.rect(surface, _BTN_BORDER, self._btn_login_rect, 2, border_radius=6)
+        pygame.draw.rect(surface, login_col, self._btn_login_rect, border_radius=_s(6))
+        pygame.draw.rect(surface, _BTN_BORDER, self._btn_login_rect, _s(2), border_radius=_s(6))
         lbl = font_btn.render("LOGIN", True, (255, 255, 255))
         surface.blit(lbl, (self._btn_login_rect.centerx - lbl.get_width() // 2,
                            self._btn_login_rect.centery - lbl.get_height() // 2))
 
         self._btn_signup_rect = pygame.Rect(bx + btn_w + gap, by, btn_w, btn_h)
         signup_col = _BTN_OUTLINE_HOVER if self._btn_signup_rect.collidepoint(mouse) else _BTN_OUTLINE
-        pygame.draw.rect(surface, signup_col, self._btn_signup_rect, border_radius=6)
-        pygame.draw.rect(surface, _BTN_BORDER, self._btn_signup_rect, 2, border_radius=6)
+        pygame.draw.rect(surface, signup_col, self._btn_signup_rect, border_radius=_s(6))
+        pygame.draw.rect(surface, _BTN_BORDER, self._btn_signup_rect, _s(2), border_radius=_s(6))
         lbl2 = font_btn.render("SIGN UP", True, (200, 240, 180))
         surface.blit(lbl2, (self._btn_signup_rect.centerx - lbl2.get_width() // 2,
                             self._btn_signup_rect.centery - lbl2.get_height() // 2))
@@ -251,37 +252,37 @@ class AuthUI:
         sw, sh = surface.get_size()
         surface.fill((173, 216, 230))
 
-        form_w = 400
-        form_h = 310
+        form_w = _s(400)
+        form_h = _s(310)
         fx     = (sw - form_w) // 2
-        fy     = (sh - form_h) // 2 - 20
+        fy     = (sh - form_h) // 2 - _s(20)
 
         panel_surf = pygame.Surface((form_w, form_h), pygame.SRCALPHA)
         panel_surf.fill(_PANEL_BG)
         surface.blit(panel_surf, (fx, fy))
-        pygame.draw.rect(surface, _BORDER, pygame.Rect(fx, fy, form_w, form_h), 1, border_radius=6)
+        pygame.draw.rect(surface, _BORDER, pygame.Rect(fx, fy, form_w, form_h), _s(1), border_radius=_s(6))
 
-        font_heading = pygame.font.SysFont("Consolas", 26, bold=True)
+        font_heading = pygame.font.SysFont("Consolas", _s(26), bold=True)
         h_surf = font_heading.render(heading, True, _TITLE_COLOR)
-        surface.blit(h_surf, (fx + form_w // 2 - h_surf.get_width() // 2, fy + 22))
+        surface.blit(h_surf, (fx + form_w // 2 - h_surf.get_width() // 2, fy + _s(22)))
 
-        field_w = form_w - 60
-        field_x = fx + 30
-        self._username.draw(surface, field_x, fy + 84,  field_w)
-        self._password.draw(surface, field_x, fy + 164, field_w)
+        field_w = form_w - _s(60)
+        field_x = fx + _s(30)
+        self._username.draw(surface, field_x, fy + _s(84),  field_w)
+        self._password.draw(surface, field_x, fy + _s(164), field_w)
 
         if self._error:
-            font_err = pygame.font.SysFont("Consolas", 13)
+            font_err = pygame.font.SysFont("Consolas", _s(13))
             err_surf = font_err.render(self._error, True, _ERROR_COLOR)
-            surface.blit(err_surf, (fx + form_w // 2 - err_surf.get_width() // 2, fy + 214))
+            surface.blit(err_surf, (fx + form_w // 2 - err_surf.get_width() // 2, fy + _s(214)))
 
         mouse    = pygame.mouse.get_pos()
-        font_btn = pygame.font.SysFont("Consolas", 16, bold=True)
+        font_btn = pygame.font.SysFont("Consolas", _s(16), bold=True)
 
-        btn_w = 160
-        btn_h = 42
+        btn_w = _s(160)
+        btn_h = _s(42)
         sbx   = fx + form_w // 2 - btn_w // 2
-        sby   = fy + form_h - 56
+        sby   = fy + form_h - _s(56)
         self._btn_submit_rect = pygame.Rect(sbx, sby, btn_w, btn_h)
 
         if self._pending:
@@ -291,17 +292,17 @@ class AuthUI:
             sub_col   = _BTN_GREEN_HOVER if self._btn_submit_rect.collidepoint(mouse) else _BTN_GREEN
             sub_label = submit_label
 
-        pygame.draw.rect(surface, sub_col, self._btn_submit_rect, border_radius=6)
-        pygame.draw.rect(surface, _BTN_BORDER, self._btn_submit_rect, 2, border_radius=6)
+        pygame.draw.rect(surface, sub_col, self._btn_submit_rect, border_radius=_s(6))
+        pygame.draw.rect(surface, _BTN_BORDER, self._btn_submit_rect, _s(2), border_radius=_s(6))
         s = font_btn.render(sub_label, True, (255, 255, 255))
         surface.blit(s, (self._btn_submit_rect.centerx - s.get_width() // 2,
                          self._btn_submit_rect.centery - s.get_height() // 2))
 
-        self._btn_back_rect = pygame.Rect(fx + 10, fy + 10, 70, 26)
+        self._btn_back_rect = pygame.Rect(fx + _s(10), fy + _s(10), _s(70), _s(26))
         back_col = _BACK_BG_HOVER if self._btn_back_rect.collidepoint(mouse) else _BACK_BG
-        pygame.draw.rect(surface, back_col, self._btn_back_rect, border_radius=4)
-        pygame.draw.rect(surface, _BORDER, self._btn_back_rect, 1, border_radius=4)
-        font_back = pygame.font.SysFont("Consolas", 12, bold=True)
+        pygame.draw.rect(surface, back_col, self._btn_back_rect, border_radius=_s(4))
+        pygame.draw.rect(surface, _BORDER, self._btn_back_rect, _s(1), border_radius=_s(4))
+        font_back = pygame.font.SysFont("Consolas", _s(12), bold=True)
         b = font_back.render("< Back", True, (200, 200, 220))
         surface.blit(b, (self._btn_back_rect.centerx - b.get_width() // 2,
                          self._btn_back_rect.centery - b.get_height() // 2))

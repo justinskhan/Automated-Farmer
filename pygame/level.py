@@ -4,6 +4,7 @@ import pygame
 from tile import Tile
 from crop import Crop, CropType
 from objective import Objective
+from ui_scale import s as _s
  
 # key for grid
 # '.' = regular walkable tile
@@ -611,7 +612,7 @@ _CROP_MAP: dict[str, CropType] = {
  
 #this class will parse thru the dict and build the tiles and crops and locate the farmer
 class Level:
-    TILE_SIZE = 120 #default tile size before screen is resized
+    TILE_SIZE = _s(120) #default tile size before screen is resized (DPR-scaled for browser)
  
     def __init__(self, data: dict):
         #initialization function pulls data from the dict
