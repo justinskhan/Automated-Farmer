@@ -165,7 +165,6 @@ LEVEL_8 = {
 }
  
 # level 9 - large grid with scattered obstacles and tight timer
-# requires careful planning and efficient loops to finish in time
 LEVEL_9 = {
     "name": "The Gauntlet",
     "number": 9,
@@ -188,7 +187,6 @@ LEVEL_9 = {
 }
  
 # level 10 - alternating corridor walls force the farmer to snake through
-# each row, requires efficient loop logic to finish in time
 LEVEL_10 = {
     "name": "The Final Harvest",
     "number": 10,
@@ -236,7 +234,6 @@ LEVEL_11 = {
 }
  
 # level 12 - columns of obstacles with open paths on both edges
-# farmer must sweep up and down between the obstacle columns
 LEVEL_12 = {
     "name": "Checkerboard",
     "number": 12,
@@ -382,9 +379,7 @@ LEVEL_17 = {
     ),
     "hint": "",
 }
- 
-# level 18 - dense alternating walls, tighter than the tunnel levels
-# requires very efficient loop logic to snake through in time
+
 LEVEL_18 = {
     "name": "The Labyrinth",
     "number": 18,
@@ -409,7 +404,6 @@ LEVEL_18 = {
 }
  
 # level 19 - scattered random-looking obstacle pattern across a large grid
-# lots of walkable tiles but the path is non-obvious, very tight timer
 LEVEL_19 = {
     "name": "The Scatterplot",
     "number": 19,
@@ -436,7 +430,6 @@ LEVEL_19 = {
 }
  
 # level 20 - the grand finale: massive grid, heavy alternating walls,
-# extremely tight timer, requires mastery of loops and planning
 LEVEL_20 = {
     "name": "The Ultimate Harvest",
     "number": 20,
