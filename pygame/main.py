@@ -134,6 +134,21 @@ _EXAMPLE_CODE = {
         "else:",
         "    move(\"down\")",
     ],
+    "break": [
+        "#stop looping early when a condition is met",
+        "for i in range(10):",
+        "    if i == 3:",
+        "        break   #exit the loop immediately",
+        "    move(\"right\")",
+    ],
+    "continue": [
+        "#skip the rest of this iteration and go to next",
+        "for i in range(5):",
+        "    if i == 2:",
+        "        continue   #skip iteration 2",
+        "    move(\"right\")",
+        "    plant(\"wheat\")",
+    ],
 }
 
 
@@ -191,7 +206,8 @@ def _draw_ide_preview(surface: pygame.Surface, x: int, y: int, w: int, lines: li
 def _draw_coloured_line(surface, font, line: str, x: int, y: int,
                         col_text, col_kw, col_str) -> None:
     KEYWORDS = {"for", "while", "in", "range", "if", "else", "and", "or",
-                "not", "True", "False", "None", "def", "return"}
+                "not", "True", "False", "None", "def", "return",
+                "break", "continue", "elif"}
 
     spans = []
     i = 0
@@ -265,6 +281,14 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked", "harvest()  [locked]", 16))
         rows.append(("desc", "Harvests the grown crop on the current tile. Unlocks soon.", 16))
 
+    rows.append(("sub", "Removing", 0))
+    if "remove" in allowed:
+        rows.append(("desc", "Removes the crop on the current tile without harvesting it.", 16))
+        rows.append(("code", "remove()", 16))
+    else:
+        rows.append(("locked", "remove()  [locked]", 16))
+        rows.append(("desc", "Removes a crop from the current tile without harvesting. Unlocks soon.", 16))
+
     rows.append(("sub", "Conditionals", 0))
     rows.append(("desc", "Run a block of code only when a condition is true.", 16))
     rows.append(("locked_example", "if <condition>:", 16, "if"))
@@ -284,9 +308,16 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked_example", "while loops  [unlocks at level 5]", 16, "while"))
         rows.append(("desc", "Repeat a block of code until a condition becomes false.", 16))
 
+    rows.append(("sub", "Loop Control", 0))
+    rows.append(("locked_example", "break", 16, "break"))
+    rows.append(("desc", "Exits the current loop immediately.", 16))
+    rows.append(("locked_example", "continue", 16, "continue"))
+    rows.append(("desc", "Skips the rest of this iteration and moves to the next.", 16))
+
     rows.append(("section", "TIPS", 0))
     rows.append(("body", "Crops must be fully grown before harvesting.", 16))
     rows.append(("body", "You can only plant on empty, walkable tiles.", 16))
+    rows.append(("body", "Use remove() to clear a crop you don't want to harvest.", 16))
     rows.append(("body", "New commands unlock as you progress.", 16))
 
     rows.append(("section", "CONTROLS", 0))
@@ -638,9 +669,10 @@ def _launch_user_code(code: str) -> None:
         try:
             compiled = compile(code, "<ide>", "exec")
             exec(compiled, {
-                "move": _record_move,
-                "plant": _record_plant,
+                "move":    _record_move,
+                "plant":   _record_plant,
                 "harvest": _record_harvest,
+                "remove":  _record_remove,
             })
         except SyntaxError as e:
             ide.log(f"Syntax error: {e.msg} (line {e.lineno})", error=True)
@@ -661,7 +693,12 @@ def _launch_user_code(code: str) -> None:
 
     def _run() -> None:
         try:
-            exec(compiled, {"move": move, "plant": plant, "harvest": harvest})
+            exec(compiled, {
+                "move":    move,
+                "plant":   plant,
+                "harvest": harvest,
+                "remove":  remove,
+            })
         except SystemExit:
             pass
         except Exception as e:
@@ -687,6 +724,9 @@ def _record_plant(crop_name: str) -> None:
 def _record_harvest() -> None:
     _pending_actions.append(("harvest", None))
 
+def _record_remove() -> None:
+    _pending_actions.append(("remove", None))
+
 
 def _tick_browser_actions() -> bool:
     """
@@ -707,6 +747,8 @@ def _tick_browser_actions() -> bool:
         plant(arg)
     elif action == "harvest":
         harvest()
+    elif action == "remove":
+        remove()
     return _action_index < len(_pending_actions)
 
 
@@ -814,6 +856,21 @@ def harvest() -> None:
         _wait_for_arrival()
 
 
+def remove() -> None:
+    """Removes the crop on the current tile without counting it as a harvest."""
+    tile = farmer.current_tile
+    if tile.crop is None:
+        ide.log("No crop to remove here.", error=True)
+        if not _IS_BROWSER:
+            _wait_for_arrival()
+        return
+    crop_name = tile.crop.crop_type.name.lower()
+    ide.log(f"Removed: {crop_name}")
+    tile.remove_crop()
+    if not _IS_BROWSER:
+        _wait_for_arrival()
+
+
 def _check_forbidden_constructs(tree: ast.AST):
     for node in ast.walk(tree):
         if isinstance(node, (ast.For, ast.AsyncFor)):
@@ -824,6 +881,8 @@ def _check_forbidden_constructs(tree: ast.AST):
                 return "while loops are locked — reach level 5 to unlock them."
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             return "import statements are not allowed."
+        # break and continue are always allowed — they only work inside
+        # for/while blocks which are already gated above, so no extra check needed.
     return None
 
 
@@ -984,9 +1043,6 @@ async def main():
     while running:
         dt = clock.tick(60) / 1000.0
 
-        # In the browser, poll the actual viewport size every frame and
-        # resize the pygame surface to match — pygbag does not always fire
-        # VIDEORESIZE on its own when the window changes.
         if _IS_BROWSER:
             try:
                 import platform as _plat
@@ -999,9 +1055,6 @@ async def main():
                 if vw > 0 and vh > 0 and (target_w != cw or target_h != ch):
                     screen = pygame.display.set_mode((target_w, target_h), pygame.RESIZABLE)
                     _pin_canvas_css(_plat, vw, vh)
-                    # IDE rect intentionally left untouched on resize — auto-scaling
-                    # caused drift due to min-size clamping on shrink, then unclamped
-                    # multiplication on grow. User can resize via the grip handle.
                     level.center_on(target_w, target_h)
                     farmer.snap_to_tile()
             except Exception:
@@ -1013,7 +1066,6 @@ async def main():
 
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-                # IDE rect intentionally left untouched — see comment in browser path.
                 level.center_on(event.w, event.h)
                 farmer.snap_to_tile()
 
@@ -1200,37 +1252,30 @@ async def main():
                 _done_event.clear()
                 _step_event.set()
         else:
-            #if user is using a browser
             if not frozen:
-                _tick_browser_actions() #check if farmer is done moving
+                _tick_browser_actions()
 
-        farmer.update(dt, level) #move the farmer to the right tile
+        farmer.update(dt, level)
         ide.update(dt)
-        level.update(dt, pygame.mouse.get_pos()) #update everything in the level
+        level.update(dt, pygame.mouse.get_pos())
 
-        #draw the environment in the following order:
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
         _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
 
-        #show the how to play screen and if it is clicked open gui
         if _show_htp_ingame:
             _htp_ingame_close, _htp_example_btns = _draw_htp_modal_ingame(screen)
         else:
             _htp_ingame_close  = None
             _htp_example_btns  = []
-            
-        #push the fully drawn frame to the screen
+
         pygame.display.flip()
 
-        #every 5 seconds print out the debug on what the grid looks like for the level
         frame_count += 1
-        if frame_count % 300 == 0:  
+        if frame_count % 300 == 0:
             print_grid(level)
-        #this doesn't actually stop anything since it is set to 0
-        #this hands the event loop over to javascript to render canvas and process events
         await asyncio.sleep(0)
 
     _stop_user_thread()
