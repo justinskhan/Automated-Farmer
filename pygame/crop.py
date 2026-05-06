@@ -62,9 +62,9 @@ class Crop:
         top    = by - stem_h
 
         if self.crop_type == CropType.WHEAT:
-            # stem
+            # tem
             pygame.draw.line(surface, _dim(_STEM, g), (cx, by), (cx, top), max(1, s // 10))
-            # two alternating leaves
+            #two alternating leaves
             if g > 0.2:
                 ll = max(3, int(s * 0.4 * g))
                 for i, side in enumerate([1, -1]):
@@ -72,13 +72,13 @@ class Crop:
                     pygame.draw.line(surface, _dim(_LEAF, g),
                                      (cx, ly), (cx + side * ll, ly - ll // 3),
                                      max(1, s // 12))
-            # golden ear
+            #golden ear
             if g > 0.5:
                 ew = max(2, int(s * 0.2 * g))
                 eh = max(3, int(s * 0.5 * g))
                 pygame.draw.ellipse(surface, _dim((210, 180, 50), g),
                                     (cx - ew, top - eh, ew * 2, eh))
-                # awns
+                #awns
                 if g > 0.75:
                     for dx in [-4, 0, 4]:
                         side = 1 if dx >= 0 else -1
@@ -89,9 +89,9 @@ class Crop:
         elif self.crop_type == CropType.CORN:
             stem_h = max(2, int(s * 1.4 * g))
             top    = by - stem_h
-            # thick stalk
+            #thick stalk
             pygame.draw.line(surface, _dim(_STEM, g), (cx, by), (cx, top), max(2, s // 7))
-            # broad leaves
+            #broad leaves
             if g > 0.15:
                 ll = max(4, int(s * 0.55 * g))
                 for i, side in enumerate([1, -1, 1, -1]):
@@ -100,7 +100,7 @@ class Crop:
                            (cx + side * ll, ly - ll // 5),
                            (cx + side * 2,  ly + 4)]
                     pygame.draw.polygon(surface, _dim(_LEAF, g), pts)
-            # cob
+            #cob
             if g > 0.55:
                 cw  = max(2, int(s * 0.2 * g))
                 ch  = max(3, int(s * 0.55 * g))
@@ -147,7 +147,7 @@ class Crop:
                     pygame.draw.circle(surface, _OUTLINE, (fx, fy), fr, 1)
 
         elif self.crop_type == CropType.CARROT:
-            # feathery tops
+            #feathery tops
             n = max(1, int(g * 6))
             for i in range(n):
                 angle = -1.0 + (i / max(n - 1, 1)) * 2.0
@@ -156,7 +156,7 @@ class Crop:
                 ty    = by - int(math.cos(angle) * ll)
                 pygame.draw.line(surface, _dim(_LEAF, g), (cx, by), (tx, ty),
                                  max(1, s // 13))
-            # tapered root below soil line
+            #tapered root below soil line
             if g > 0.1:
                 rw  = max(2, int(s * 0.22 * g))
                 rl  = max(3, int(s * 0.7  * g))

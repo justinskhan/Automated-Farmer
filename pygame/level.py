@@ -308,7 +308,7 @@ LEVEL_14 = {
 # level 15 - walls block large sections but alternate sides each row
 # farmer must find the gap on each wall to pass through to the next corridor
 LEVEL_15 = {
-    "name": "The Archipelago",
+    "name": "Hallways",
     "number": 15,
     "grid": [
         "F..........",
@@ -333,7 +333,7 @@ LEVEL_15 = {
 # level 16 - long hallways separated by walls with alternating gaps
 # farmer must efficiently loop back and forth through each corridor
 LEVEL_16 = {
-    "name": "Hallways",
+    "name": "Hallways 2",
     "number": 16,
     "grid": [
         "F.........",
@@ -358,7 +358,7 @@ LEVEL_16 = {
 # level 17 - open center ringed by obstacles with one gap at the bottom
 # farmer starts outside and must find the entry point to farm inside
 LEVEL_17 = {
-    "name": "The Moat",
+    "name": "Square",
     "number": 17,
     "grid": [
         "F.........",
@@ -381,7 +381,7 @@ LEVEL_17 = {
 }
 
 LEVEL_18 = {
-    "name": "The Labyrinth",
+    "name": "Long Walk",
     "number": 18,
     "grid": [
         "F.........",
@@ -403,7 +403,7 @@ LEVEL_18 = {
     "hint": "",
 }
  
-# level 19 - scattered random-looking obstacle pattern across a large grid
+#level 19 - scattered random-looking obstacle pattern across a large grid
 LEVEL_19 = {
     "name": "The Scatterplot",
     "number": 19,
@@ -431,7 +431,7 @@ LEVEL_19 = {
  
 # level 20 - the grand finale: massive grid, heavy alternating walls,
 LEVEL_20 = {
-    "name": "The Ultimate Harvest",
+    "name": "Row of X",
     "number": 20,
     "grid": [
         "F.........",
@@ -456,7 +456,7 @@ LEVEL_20 = {
 }
 
 LEVEL_21 = {
-    "name": "The Serpentine",
+    "name": "Row of X Part 2",
     "number": 21,
     "grid": [
         "F...........",
@@ -560,7 +560,7 @@ LEVEL_24 = {
  
 
 LEVEL_25 = {
-    "name": "The Grand Finale",
+    "name": "The Grand Finale Maybe?",
     "number": 25,
     "grid": [
         "F.............",
@@ -586,6 +586,137 @@ LEVEL_25 = {
     "hint": "",
 }
  
+LEVEL_26 = {
+    "name": "Alt",
+    "number": 26,
+    "grid": [
+        "F..............",
+        ".X.X.X.X.X.X..",
+        "..............",
+        "..X.X.X.X.X.X.",
+        "..............",
+        ".X.X.X.X.X.X..",
+        "..............",
+        "..X.X.X.X.X.X.",
+        "..............",
+        ".X.X.X.X.X.X..",
+        "..............",
+    ],
+    "objective": Objective(
+        harvests_required=52,
+        time_limit=28.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 13, "corn": 13, "tomato": 13, "carrot": 13},
+    ),
+    "hint": "",
+}
+ 
+LEVEL_27 = {
+    "name": "Ring",
+    "number": 27,
+    "grid": [
+        "F................",
+        ".XXXXXXXXXXXXXXX.",
+        ".X.............X.",
+        ".X.XXXXXXXXXXX.X.",
+        ".X.X.........X.X.",
+        ".X.X.XXXXXXX.X.X.",
+        ".X.X.X.....X.X.X.",
+        ".X.X.X.....X.X.X.",
+        ".X.X.XXXXX.X.X.X.",
+        ".X.XXXXXXXXX.X.X.",
+        ".X...........X.X.",
+        ".XXXXX.XXXXXXX.X.",
+        "...............X.",
+        ".XXXXXXXXXXXXXXX.",
+        ".................",
+    ],
+    "objective": Objective(
+        harvests_required=52,
+        time_limit=26.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 13, "corn": 13, "tomato": 13, "carrot": 13},
+    ),
+    "hint": "",
+}
+ 
+LEVEL_28 = {
+    "name": "Idk",
+    "number": 28,
+    "grid": [
+        "F..............",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        ".XX.XX.XX.XX..",
+        "..............",
+    ],
+    "objective": Objective(
+        harvests_required=56,
+        time_limit=25.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 14, "corn": 14, "tomato": 14, "carrot": 14},
+    ),
+    "hint": "",
+}
+ 
+LEVEL_29 = {
+    "name": "J",
+    "number": 29,
+    "grid": [
+        "F................",
+        "....XXXXX........",
+        "......X..........",
+        "......X..XXXXX...",
+        "......X....X.....",
+        "XXXXX......X.....",
+        "..X........X.....",
+        "..X....XXXXX.....",
+        "..X..............",
+        "..XXXXX..........",
+        ".................",
+    ],
+    "objective": Objective(
+        harvests_required=56,
+        time_limit=24.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 14, "corn": 14, "tomato": 14, "carrot": 14},
+    ),
+    "hint": "",
+}
+ 
+LEVEL_30 = {
+    "name": "The Last",
+    "number": 30,
+    "grid": [
+        "F.................",
+        "XXXXXXXXXXXXXXXXX.",
+        "..................",
+        ".XXXXXXXXXXXXXXXXX",
+        "..................",
+        "XXXXXXXXXXXXXXXXX.",
+        "..................",
+        ".XXXXXXXXXXXXXXXXX",
+        "..................",
+        "XXXXXXXXXXXXXXXXX.",
+        "..................",
+        ".XXXXXXXXXXXXXXXXX",
+        "..................",
+    ],
+    "objective": Objective(
+        harvests_required=60,
+        time_limit=22.0,
+        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        crop_requirements={"wheat": 15, "corn": 15, "tomato": 15, "carrot": 15},
+    ),
+    "hint": "",
+}
+
+
 _ALL_LEVELS = [
     LEVEL_1,  LEVEL_2,  LEVEL_3,  LEVEL_4,  LEVEL_5,
     LEVEL_6,  LEVEL_7,  LEVEL_8,  LEVEL_9,  LEVEL_10,
