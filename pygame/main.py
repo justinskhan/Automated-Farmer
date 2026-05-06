@@ -15,6 +15,8 @@ import asyncio as _asyncio
 import api_client
 from auth_ui import AuthUI
 from ui_scale import s as _s
+from unlock_tree import UnlockTree
+import unlock_screen as _unlock_screen
 
 #boolean that uses emscripten and wasi which are browser platform names pygame recognizes
 _IS_BROWSER = sys.platform in ("emscripten", "wasi")
@@ -81,8 +83,9 @@ STATE_START   = "start"
 STATE_PLAYING = "playing"
 STATE_AUTH    = "auth"
 STATE_LOGIN   = "login"
-STATE_SIGNUP  = "signup"
-game_state    = STATE_AUTH
+STATE_SIGNUP     = "signup"
+STATE_TECH_TREE  = "tech_tree"
+game_state       = STATE_AUTH
 
 
 # start screen animation state
@@ -763,7 +766,7 @@ def _reload_level() -> None:
     ide.lines = [""]
     ide.cursor_row = 0
     ide.cursor_col = 0
-    ide.update_allowed(level.objective.allowed_commands)
+    ide.update_allowed(unlock_tree.effective_commands(level.objective.allowed_commands))
 
 
 def _advance_level() -> None:
@@ -778,7 +781,7 @@ def _advance_level() -> None:
     ide.lines = [""]
     ide.cursor_row = 0
     ide.cursor_col = 0
-    ide.update_allowed(level.objective.allowed_commands)
+    ide.update_allowed(unlock_tree.effective_commands(level.objective.allowed_commands))
 
 
 def move(direction: str) -> None:
@@ -873,16 +876,17 @@ def remove() -> None:
 
 def _check_forbidden_constructs(tree: ast.AST):
     for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            if not unlock_tree.is_unlocked("if"):
+                return "if/else is not unlocked yet — open the Unlocks screen."
         if isinstance(node, (ast.For, ast.AsyncFor)):
-            if "for" not in level.objective.allowed_commands:
-                return "for loops are locked — reach level 3 to unlock them."
+            if not unlock_tree.is_unlocked("for"):
+                return "for loops are not unlocked yet — open the Unlocks screen."
         if isinstance(node, ast.While):
-            if "while" not in level.objective.allowed_commands:
-                return "while loops are locked — reach level 5 to unlock them."
+            if not unlock_tree.is_unlocked("while"):
+                return "while loops are not unlocked yet — open the Unlocks screen."
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             return "import statements are not allowed."
-        # break and continue are always allowed — they only work inside
-        # for/while blocks which are already gated above, so no extra check needed.
     return None
 
 
@@ -1015,10 +1019,31 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(reset_lbl, (reset_btn_rect.x + (htp_w - reset_lbl.get_width())  // 2,
                               reset_btn_rect.y + (htp_h - reset_lbl.get_height()) // 2))
 
-    return center_btn_rect, htp_btn_rect, reset_btn_rect
+    unlocks_w = htp_w
+    unlocks_h = htp_h
+    ux = hx
+    uy = reset_btn_rect.bottom + _s(6)
+
+    unlocks_btn_rect = pygame.Rect(ux, uy, unlocks_w, unlocks_h)
+    unlocks_hovered  = unlocks_btn_rect.collidepoint(pygame.mouse.get_pos())
+
+    unlocks_bg_col = (20, 45, 20, 210) if unlocks_hovered else (10, 30, 10, 190)
+    unlocks_bg = pygame.Surface((unlocks_w, unlocks_h), pygame.SRCALPHA)
+    unlocks_bg.fill(unlocks_bg_col)
+    surface.blit(unlocks_bg, (ux, uy))
+
+    pygame.draw.rect(surface, (60, 110, 60), unlocks_btn_rect, _s(1), border_radius=_s(4))
+
+    font_unlocks = pygame.font.SysFont("Consolas", _s(14), bold=True)
+    unlocks_lbl  = font_unlocks.render("Unlocks", True, (140, 225, 140))
+    surface.blit(unlocks_lbl, (ux + (unlocks_w - unlocks_lbl.get_width())  // 2,
+                                uy + (unlocks_h - unlocks_lbl.get_height()) // 2))
+
+    return center_btn_rect, htp_btn_rect, reset_btn_rect, unlocks_btn_rect
 
 
-ide.update_allowed(level.objective.allowed_commands)
+unlock_tree = UnlockTree()
+ide.update_allowed(unlock_tree.effective_commands(level.objective.allowed_commands))
 
 frame_count = 0
 running     = True
@@ -1027,7 +1052,11 @@ frozen      = False
 _center_btn       = None
 _htp_btn          = None
 _reset_btn        = None
+_unlocks_btn      = None
 _htp_example_btns = []
+
+_tech_tree_node_rects: dict = {}
+_tech_tree_back_rect        = None
 
 
 async def main():
@@ -1035,7 +1064,8 @@ async def main():
     global _btn_hovered, _pulse_timer, _current_btn_rect
     global _show_htp_ingame, _htp_ingame_close, _htp_scroll_offset
     global _htp_example_open, _htp_example_btns
-    global _center_btn, _htp_btn, _reset_btn
+    global _center_btn, _htp_btn, _reset_btn, _unlocks_btn
+    global _tech_tree_node_rects, _tech_tree_back_rect
     global frame_count
     global screen
     global current_user, _auth_task, _auth_creds
@@ -1099,6 +1129,20 @@ async def main():
                                 _auth_task = _asyncio.create_task(api_client.signup(u, p))
                 continue
 
+            if game_state == STATE_TECH_TREE:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if _tech_tree_back_rect and _tech_tree_back_rect.collidepoint(event.pos):
+                        game_state = STATE_PLAYING
+                    else:
+                        for k, r in _tech_tree_node_rects.items():
+                            if r.collidepoint(event.pos):
+                                if unlock_tree.try_unlock(k, manager._index):
+                                    ide.update_allowed(
+                                        unlock_tree.effective_commands(level.objective.allowed_commands)
+                                    )
+                                break
+                continue
+
             if frozen:
                 if overlay.handle_event(event):
                     obj = level.objective
@@ -1151,6 +1195,10 @@ async def main():
 
                 if _reset_btn and _reset_btn.collidepoint(event.pos):
                     _reload_level()
+                    continue
+
+                if _unlocks_btn and _unlocks_btn.collidepoint(event.pos):
+                    game_state = STATE_TECH_TREE
                     continue
 
             code = ide.handle_event(event)
@@ -1212,12 +1260,20 @@ async def main():
 
         _current_btn_rect = None
 
+        if game_state == STATE_TECH_TREE:
+            _tech_tree_node_rects, _tech_tree_back_rect = _unlock_screen.draw(
+                screen, unlock_tree, manager._index
+            )
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            continue
+
         if frozen:
             background.draw(screen)
             level.draw(screen)
             farmer.draw(screen)
             ide.draw(screen)
-            _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
+            _center_btn, _htp_btn, _reset_btn, _unlocks_btn = _draw_hud(screen, level)
             obj = level.objective
             overlay.draw(
                 screen,
@@ -1263,7 +1319,7 @@ async def main():
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _center_btn, _htp_btn, _reset_btn = _draw_hud(screen, level)
+        _center_btn, _htp_btn, _reset_btn, _unlocks_btn = _draw_hud(screen, level)
 
         if _show_htp_ingame:
             _htp_ingame_close, _htp_example_btns = _draw_htp_modal_ingame(screen)
