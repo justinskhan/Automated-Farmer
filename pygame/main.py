@@ -311,50 +311,51 @@ def _build_htp_content(allowed: list) -> list:
         rows.append(("locked", "harvest()  [locked]", 16))
         rows.append(("desc", "Harvests the grown crop on the current tile. Unlocks soon.", 16))
 
-    #show remove as available or locked depending on the level
     rows.append(("sub", "Removing", 0))
-    if "remove" in allowed:
-        rows.append(("desc", "Removes the crop on the current tile without harvesting it.", 16))
-        rows.append(("code", "remove()", 16))
-    else:
-        rows.append(("locked", "remove()  [locked]", 16))
-        rows.append(("desc", "Removes a crop from the current tile without harvesting. Unlocks soon.", 16))
+    rows.append(("desc", "Removes the crop on the current tile without harvesting it.", 16))
+    rows.append(("code", "remove()", 16))
+
 
     #conditionals are always available, just show the syntax
     rows.append(("sub", "Conditionals", 0))
     rows.append(("desc", "Run a block of code only when a condition is true.", 16))
-    rows.append(("locked_example", "if <condition>:", 16, "if"))
     rows.append(("desc", "Use elif for extra conditions, else as a fallback.", 16))
+    rows.append(("code", "if <condition>:", 16))
+    rows.append(("code", "elif <condition>:", 16))
+    rows.append(("code", "else:", 16))
+    rows.append(("locked_example", "Example", 16, "if"))
 
     #show for loops as available or locked depending on the level
     rows.append(("sub", "Loops", 0))
     if "for" in allowed:
-        rows.append(("locked_example", "for i in range(n):", 16, "for"))
         rows.append(("desc", "Repeats the indented block exactly n times.", 16))
+        rows.append(("locked_example", "for i in range(n):", 16, "for"))
     else:
-        rows.append(("locked_example", "for loops  [unlocks at level 3]", 16, "for"))
         rows.append(("desc", "Repeat a block of code a fixed number of times.", 16))
+        rows.append(("locked_example", "for loops  [unlocks at level 3]", 16, "for"))
 
     #show while loops as available or locked depending on the level
     if "while" in allowed:
-        rows.append(("locked_example", "while <condition>:", 16, "while"))
         rows.append(("desc", "Keeps repeating the block as long as the condition is true.", 16))
+        rows.append(("locked_example", "while <condition>:", 16, "while"))
     else:
-        rows.append(("locked_example", "while loops  [unlocks at level 5]", 16, "while"))
         rows.append(("desc", "Repeat a block of code until a condition becomes false.", 16))
+        rows.append(("locked_example", "while loops  [unlocks at level 5]", 16, "while"))
 
     #break and continue work inside any loop so always show them
     rows.append(("sub", "Loop Control", 0))
-    rows.append(("locked_example", "break", 16, "break"))
     rows.append(("desc", "Exits the current loop immediately.", 16))
-    rows.append(("locked_example", "continue", 16, "continue"))
+    rows.append(("locked_example", "break", 16, "break"))
     rows.append(("desc", "Skips the rest of this iteration and moves to the next.", 16))
+    rows.append(("locked_example", "continue", 16, "continue"))
 
     rows.append(("section", "TIPS", 0))
     rows.append(("body", "Crops must be fully grown before harvesting.", 16))
     rows.append(("body", "You can only plant on empty, walkable tiles.", 16))
     rows.append(("body", "Use remove() to clear a crop you don't want to harvest.", 16))
     rows.append(("body", "New commands unlock as you progress.", 16))
+    rows.append(("body", "The farmer moves one tile at a time:", 16))
+    rows.append(("body", "up, down, left, or right only.", 16))
 
     rows.append(("section", "CONTROLS", 0))
     rows.append(("body", "Click the Run button to play.", 16))
