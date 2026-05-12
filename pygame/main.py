@@ -3,6 +3,7 @@ import pygame
 import ast
 import math
 import sys
+import os
 from background import Background
 from level import LevelManager
 from farmer import Farmer
@@ -20,6 +21,12 @@ import unlock_screen as _unlock_screen
 
 #true if running in a browser, false if running on desktop
 _IS_BROWSER = sys.platform in ("emscripten", "wasi")
+
+#sqlite persistence — only available on desktop (sqlite3 not supported in wasm)
+if not _IS_BROWSER:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "db"))
+    import game_db
+    game_db.init_db()
 
 pygame.init() #initializes game
 pygame.key.set_repeat(400, 40) #lets player hold a key and have it repeat, 400ms delay then 40ms after
@@ -744,6 +751,13 @@ def _launch_user_code(code: str) -> None:
     #compile and run the players code, either in a thread or by recording actions
     global _user_thread, _pending_actions, _action_index
 
+    #persist the submitted script and count this as an attempt
+    if not _IS_BROWSER and current_user:
+        username = current_user["username"]
+        level_id = manager._index + 1
+        game_db.save_script(username, level_id, code)
+        game_db.record_attempt(username, level_id)
+
     if _IS_BROWSER:
         #browser path: run the code but swap the real commands for recorders
         #this collects all actions into a list without actually moving the farmer
@@ -857,6 +871,12 @@ def _advance_level() -> None:
     #move to the next level, or reload the last level if there are no more
     global level, farmer
     _stop_user_thread()
+    if not _IS_BROWSER and current_user:
+        game_db.record_completion(
+            current_user["username"],
+            manager._index + 1,
+            level.objective.elapsed,
+        )
     if not manager.next_level(*screen.get_size()):
         manager.reload(*screen.get_size())
     level  = manager.current
