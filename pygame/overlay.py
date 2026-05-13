@@ -132,8 +132,17 @@ class Overlay:
         old_clip = surface.get_clip()
         surface.set_clip(panel)
  
-        y = py + _s(20)
- 
+        total_h = _s(32 + 8)   
+        total_h += _s(18 + 14)
+        if is_win:
+            total_h += _s(88)  
+            total_h += _s(17 + 4) * 2  
+        else:
+            total_h += _s(17 + 6) * 2 
+        btn_h_est = btn_font.size("X")[1] + _s(14)
+        total_h += _s(14) + btn_h_est 
+
+        y = py + (ph - total_h) // 2 
         #draw the title text
         title_text  = "Level Complete!" if is_win else "Time's Up!"
         title_color = _TITLE_WIN if is_win else _TITLE_FAIL
@@ -194,8 +203,7 @@ class Overlay:
         bw = btn_surf.get_width() + _s(44)
         bh = btn_surf.get_height() + _s(14)
         bx = px + (pw - bw) // 2
-        by = py + ph - bh - _s(18)
- 
+        by = y + _s(14) 
         self._btn_rect = pygame.Rect(bx, by, bw, bh)
  
         pygame.draw.rect(surface,

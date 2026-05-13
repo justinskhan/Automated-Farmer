@@ -20,3 +20,13 @@ cmake-build-*/
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# SQLite runtime files (keep schema.sql and game_db.py, not the live database)
+*.db
+*.db-shm
+*.db-wal
