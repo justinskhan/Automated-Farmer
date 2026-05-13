@@ -45,59 +45,52 @@ LEVEL_2 = {
     "hint": "",
 }
  
-# level 3 - bigger grid, harvest 5 crops, no timer — for loops unlocked here
+# level 3 - Rainbow Farm: introduce if/elif within for loops
 LEVEL_3 = {
-    "name": "Growing Season",
+    "name": "Rainbow Farm",
     "number": 3,
     "grid": [
-        "F...",
-        "....",
-        "....",
-        "....",
+        "F......",
     ],
     "objective": Objective(
-        harvests_required=5,
+        harvests_required=6,
+        crop_requirements={"wheat": 2, "corn": 2, "tomato": 2},
         time_limit=None,
-        allowed_commands=["move", "plant", "harvest", "for"],
+        allowed_commands=["move", "plant", "harvest", "for", "if", "elif"],
     ),
-    "hint": "",
+    "hint": "Use if and elif inside your for loop to plant different crops at different positions!",
 }
  
-# level 4 - same grid but now has a time limit to add pressure
+# level 4 - Split Farm: if/else within for loops
 LEVEL_4 = {
-    "name": "Race the Clock",
+    "name": "Split Farm",
     "number": 4,
     "grid": [
-        "F...",
-        "....",
-        "....",
-        "....",
+        "F........",
     ],
     "objective": Objective(
         harvests_required=8,
-        time_limit=90.0,
-        allowed_commands=["move", "plant", "harvest", "for"],
+        crop_requirements={"corn": 4, "wheat": 4},
+        time_limit=None,
+        allowed_commands=["move", "plant", "harvest", "for", "if", "else"],
     ),
-    "hint": "",
+    "hint": "Use if and else to plant different crops in the first and second halves!",
 }
  
-# level 5 - while loops unlocked here, bigger grid, harder goal
+# level 5 - Harvest Challenge: introduce while loops with pre-planted crops
 LEVEL_5 = {
-    "name": "Automation Station",
+    "name": "Harvest Challenge",
     "number": 5,
     "grid": [
-        "F....",
-        ".....",
-        ".....",
-        ".....",
-        ".....",
+        "FWWWWW",
     ],
     "objective": Objective(
-        harvests_required=15,
-        time_limit=120.0,
-        allowed_commands=["move", "plant", "harvest", "for", "while"],
+        harvests_required=5,
+        crop_requirements={"wheat": 5},
+        time_limit=None,
+        allowed_commands=["move", "harvest", "while"],
     ),
-    "hint": "",
+    "hint": "Use a while loop to move and harvest until you've collected 5 wheat crops!",
 }
  
 # level 6 - obstacles introduced, must harvest specific crops
