@@ -1,0 +1,12 @@
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/CMakeFiles/automated_farmer.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/CMakeFiles/glad.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/CMakeFiles/INSTALL.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/CMakeFiles/uninstall.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/CMakeFiles/INSTALL.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/CMakeFiles/ALL_BUILD.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/src/CMakeFiles/glfw.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/src/CMakeFiles/update_mappings.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/src/CMakeFiles/INSTALL.dir
+C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/docs/CMakeFiles/INSTALL.dir

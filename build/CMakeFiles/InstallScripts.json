@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/cmake_install.cmake",
+		"C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/cmake_install.cmake",
+		"C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/src/cmake_install.cmake",
+		"C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/third_party/glfw/docs/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

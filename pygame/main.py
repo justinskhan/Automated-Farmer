@@ -1355,14 +1355,21 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     btn_h = time_box_h
     bx    = tx
     by    = ty + time_box_h + _s(6)
+    gap   = _s(6)
 
     #shrink button height if all 5 buttons + gaps won't fit in the remaining screen space
     _n_btns    = 5
-    _gap_total = _s(6) * (_n_btns - 1)
+    _gap_total = gap * (_n_btns - 1)
     _avail     = surface.get_height() - by - _s(10)
     if _n_btns * btn_h + _gap_total > _avail:
-        #use plain pixels (not _s()) for the minimum so high-DPR screens don't force an overflow
-        btn_h = max(20, (_avail - _gap_total) // _n_btns)
+        #shrink uniformly so 5 buttons + 4 gaps fit
+        btn_h = max(12, (_avail - _gap_total) // _n_btns)
+    #if still too tall (very short canvas), tighten the gap to 2px and slide the stack up
+    if _n_btns * btn_h + _gap_total > _avail:
+        gap = 2
+        _gap_total = gap * (_n_btns - 1)
+        total_h = _n_btns * btn_h + _gap_total
+        by = max(_s(4), surface.get_height() - total_h - _s(4))
 
     center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
     btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())
@@ -1383,7 +1390,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     htp_w = btn_w
     htp_h = btn_h
     hx    = bx
-    hy    = by + btn_h + _s(6)
+    hy    = by + btn_h + gap
 
     htp_btn_rect = pygame.Rect(hx, hy, htp_w, htp_h)
     htp_hovered  = htp_btn_rect.collidepoint(pygame.mouse.get_pos())
@@ -1401,13 +1408,13 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
                              hy + (htp_h - htp_lbl.get_height()) // 2))
 
     #reset level button restarts the current level from scratch
-    reset_btn_rect = pygame.Rect(hx, hy + htp_h + _s(6), htp_w, htp_h)
+    reset_btn_rect = pygame.Rect(hx, hy + htp_h + gap, htp_w, htp_h)
     reset_hovered  = reset_btn_rect.collidepoint(pygame.mouse.get_pos())
 
     reset_bg_col = (60, 20, 20, 210) if reset_hovered else (35, 15, 15, 190)
     reset_bg = pygame.Surface((htp_w, htp_h), pygame.SRCALPHA)
     reset_bg.fill(reset_bg_col)
-    surface.blit(reset_bg, (hx, hy + htp_h + _s(6)))
+    surface.blit(reset_bg, (hx, hy + htp_h + gap))
 
     pygame.draw.rect(surface, (120, 50, 50), reset_btn_rect, _s(1), border_radius=_s(4))
 
@@ -1419,7 +1426,7 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     unlocks_w = htp_w
     unlocks_h = htp_h
     ux = hx
-    uy = reset_btn_rect.bottom + _s(6)
+    uy = reset_btn_rect.bottom + gap
 
     unlocks_btn_rect = pygame.Rect(ux, uy, unlocks_w, unlocks_h)
     unlocks_hovered  = unlocks_btn_rect.collidepoint(pygame.mouse.get_pos())
@@ -1437,20 +1444,28 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
                                 uy + (unlocks_h - unlocks_lbl.get_height()) // 2))
 
     #levels button — directly below unlocks, same green theme
-    levels_btn_rect = pygame.Rect(ux, unlocks_btn_rect.bottom + _s(6), unlocks_w, unlocks_h)
+    #clamp position so it always fits within the surface even on very short canvases
+    levels_x = ux
+    levels_y = uy + unlocks_h + gap
+    max_y    = surface.get_height() - unlocks_h - _s(2)
+    if levels_y > max_y:
+        levels_y = max_y
+    levels_btn_rect = pygame.Rect(levels_x, levels_y, unlocks_w, unlocks_h)
     levels_hovered  = levels_btn_rect.collidepoint(pygame.mouse.get_pos())
 
-    levels_bg_col = (20, 45, 20, 210) if levels_hovered else (10, 30, 10, 190)
+    #use higher alpha than the other buttons so the dark green is clearly visible
+    #even when drawn over grass instead of sky
+    levels_bg_col = (20, 45, 20, 245) if levels_hovered else (10, 30, 10, 235)
     levels_bg = pygame.Surface((unlocks_w, unlocks_h), pygame.SRCALPHA)
     levels_bg.fill(levels_bg_col)
-    surface.blit(levels_bg, levels_btn_rect.topleft)
+    surface.blit(levels_bg, (levels_x, levels_y))
 
-    pygame.draw.rect(surface, (60, 110, 60), levels_btn_rect, _s(1), border_radius=_s(4))
+    pygame.draw.rect(surface, (90, 160, 90), levels_btn_rect, _s(2), border_radius=_s(4))
 
     font_levels = pygame.font.SysFont("Consolas", _s(14), bold=True)
-    levels_lbl  = font_levels.render("Levels", True, (140, 225, 140))
-    surface.blit(levels_lbl, (levels_btn_rect.x + (unlocks_w - levels_lbl.get_width())  // 2,
-                               levels_btn_rect.y + (unlocks_h - levels_lbl.get_height()) // 2))
+    levels_lbl  = font_levels.render("Levels", True, (160, 240, 160))
+    surface.blit(levels_lbl, (levels_x + (unlocks_w - levels_lbl.get_width())  // 2,
+                               levels_y + (unlocks_h - levels_lbl.get_height()) // 2))
 
     #return all five button rects so the main loop can check for clicks
     return center_btn_rect, htp_btn_rect, reset_btn_rect, unlocks_btn_rect, levels_btn_rect

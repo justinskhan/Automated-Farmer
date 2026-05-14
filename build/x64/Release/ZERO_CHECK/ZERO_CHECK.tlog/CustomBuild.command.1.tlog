@@ -1,0 +1,10 @@
+^C:\USERS\USER\DESKTOP\AUTOMATEDFARMER\AUTOMATED-FARMER\BUILD\CMAKEFILES\BB44E211CABA284315250912B23055A7\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer -BC:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/USER/Desktop/AutomatedFarmer/Automated-Farmer/build/automated_farmer.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
