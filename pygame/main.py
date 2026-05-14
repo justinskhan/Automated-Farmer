@@ -659,8 +659,8 @@ def _draw_levels_modal(surface: pygame.Surface):
     backdrop.fill((0, 0, 0, 170))
     surface.blit(backdrop, (0, 0))
 
-    mw = _s(560)
-    mh = min(_s(520), sh - _s(40))
+    mw = _s(700)
+    mh = min(_s(650), sh - _s(40))
     mx = (sw - mw) // 2
     my = (sh - mh) // 2
 
@@ -670,18 +670,18 @@ def _draw_levels_modal(surface: pygame.Surface):
     CONTENT_W   = mw - _s(16) - SCROLLBAR_W
 
     font_title    = pygame.font.SysFont("Consolas", _s(20), bold=True)
-    font_num      = pygame.font.SysFont("Consolas", _s(11), bold=True)
-    font_name     = pygame.font.SysFont("Consolas", _s(10))
+    font_num      = pygame.font.SysFont("Consolas", _s(14), bold=True)
+    font_name     = pygame.font.SysFont("Consolas", _s(12))
 
     #card layout constants
     CARD_COLS  = 3
-    CARD_GAP   = _s(8)
-    CARD_PAD   = _s(5)
-    LABEL_H    = _s(14)
-    ICON_H     = _s(72)
-    NAME_H     = _s(14)
+    CARD_GAP   = _s(10)
+    CARD_PAD   = _s(6)
+    LABEL_H    = _s(17)
+    ICON_H     = _s(90)
+    NAME_H     = _s(17)
     card_w     = (CONTENT_W - CARD_GAP * (CARD_COLS - 1)) // CARD_COLS
-    card_h     = CARD_PAD + LABEL_H + _s(4) + ICON_H + _s(4) + NAME_H + CARD_PAD
+    card_h     = CARD_PAD + LABEL_H + _s(5) + ICON_H + _s(5) + NAME_H + CARD_PAD
 
     all_levels = _get_all_levels()
     n_rows_grid = math.ceil(len(all_levels) / CARD_COLS)
@@ -1355,6 +1355,13 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     btn_h = time_box_h
     bx    = tx
     by    = ty + time_box_h + _s(6)
+
+    #shrink button height if all 5 buttons + gaps won't fit in the remaining screen space
+    _n_btns     = 5
+    _gap_total  = _s(6) * (_n_btns - 1)
+    _avail      = surface.get_height() - by - _s(10)
+    if _n_btns * btn_h + _gap_total > _avail:
+        btn_h = max(_s(26), (_avail - _gap_total) // _n_btns)
 
     center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
     btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())
