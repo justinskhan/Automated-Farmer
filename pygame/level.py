@@ -811,6 +811,11 @@ class Level:
                 tile.draw(surface)
  
  
+def get_all_levels() -> list[dict]:
+    """Return all level definitions in order (read-only)."""
+    return _ALL_LEVELS
+
+
 #this class tracks the current level and adjusts for levels
 class LevelManager:
     def __init__(self):
@@ -835,6 +840,12 @@ class LevelManager:
         self.current.objective.reset()  
         self.current.center_on(screen_w, screen_h)
  
+    def jump_to_level(self, index: int, screen_w: int, screen_h: int) -> None:
+        """Jump directly to a specific level by 0-based index."""
+        self._index = max(0, min(len(_ALL_LEVELS) - 1, index))
+        self.current = self._load(self._index)
+        self.current.center_on(screen_w, screen_h)
+
     #returns true if there are no more levels after the current one
     @property
     def on_last_level(self) -> bool:

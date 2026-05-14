@@ -82,6 +82,16 @@ def get_last_script(username: str, level_id: int) -> str | None:
     return row[0] if row else None
 
 
+def get_completed_level_ids(username: str) -> set[int]:
+    """Return the set of 1-based level IDs the user has completed."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT level_id FROM progress WHERE username = ? AND completed = 1",
+            (username,),
+        ).fetchall()
+    return {r[0] for r in rows}
+
+
 def get_progress(username: str) -> list[dict]:
     """Return all progress rows for a user (used for analytics / display)."""
     with _connect() as conn:

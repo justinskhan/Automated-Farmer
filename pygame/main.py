@@ -5,7 +5,7 @@ import math
 import sys
 import os
 from background import Background
-from level import LevelManager
+from level import LevelManager, get_all_levels as _get_all_levels
 from farmer import Farmer
 from ide import IDE
 from crop import Crop, CropType
@@ -109,9 +109,35 @@ _current_btn_rect = None
 _show_htp_ingame   = False
 _htp_ingame_close  = None
 _htp_scroll_offset = 0
+_htp_scroll_velocity    = 0.0   # inertia: pixels per frame added to offset
+_htp_scrollbar_dragging = False  # True while user drags the scrollbar thumb
+_htp_scrollbar_drag_y   = 0     # mouse y when drag started
+_htp_scrollbar_drag_off = 0     # scroll offset when drag started
+_htp_scrollbar_thumb_rect = None # scrollbar thumb rect, updated each draw
+_htp_scrollbar_track_rect = None # scrollbar track rect, updated each draw
+_htp_max_scroll         = 0     # max scrollable distance, updated each draw
 
 #which example code panel is open inside the how to play modal
 _htp_example_open = None
+
+#levels modal state — tracks whether it is open, scroll position, and scrollbar drag
+_show_levels_modal        = False
+_levels_modal_close       = None
+_levels_cards             = []      # list of (level_index, screen_rect) for clickable cards
+_levels_scroll_offset     = 0
+_levels_scroll_velocity   = 0.0
+_levels_scrollbar_dragging = False
+_levels_scrollbar_drag_y  = 0
+_levels_scrollbar_drag_off = 0
+_levels_scrollbar_thumb_rect = None
+_levels_scrollbar_track_rect = None
+_levels_max_scroll        = 0
+
+#set of 1-based level IDs the current player has completed (loaded from DB or tracked in-session)
+_completed_level_ids: set[int] = set()
+
+#hud button rects (also tracks the new levels button)
+_levels_btn = None
 
 #example code snippets shown when the player clicks the example button in how to play
 _EXAMPLE_CODE = {
@@ -372,7 +398,7 @@ def _build_htp_content(allowed: list) -> list:
 
 def _draw_htp_modal_ingame(surface: pygame.Surface):
     #draws the how to play popup over the game
-    global _htp_scroll_offset
+    global _htp_scroll_offset, _htp_scrollbar_thumb_rect, _htp_scrollbar_track_rect, _htp_max_scroll
 
     sw, sh = surface.get_size()
 
@@ -438,6 +464,7 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
     max_scroll = max(0, content_h - viewport_h)
     #clamp scroll so it doesnt go past the bottom
     _htp_scroll_offset = min(_htp_scroll_offset, max_scroll)
+    _htp_max_scroll = max_scroll
 
     #draw everything onto an offscreen surface so we can clip it to the viewport
     content_surf = pygame.Surface((CONTENT_W, content_h), pygame.SRCALPHA)
@@ -577,8 +604,14 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
         thumb_h   = max(20, int(sb_h * viewport_h / content_h))
         thumb_top = sb_y + int((sb_h - thumb_h) * _htp_scroll_offset / max_scroll)
 
-        pygame.draw.rect(surface, (40, 50, 40), pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h), border_radius=4)
-        pygame.draw.rect(surface, (90, 160, 80), pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h), border_radius=4)
+        _htp_scrollbar_track_rect = pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h)
+        _htp_scrollbar_thumb_rect = pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h)
+
+        pygame.draw.rect(surface, (40, 50, 40), _htp_scrollbar_track_rect, border_radius=4)
+        pygame.draw.rect(surface, (90, 160, 80), _htp_scrollbar_thumb_rect, border_radius=4)
+    else:
+        _htp_scrollbar_track_rect = None
+        _htp_scrollbar_thumb_rect = None
 
     #draw the close button in the top right corner of the modal
     close_size    = _s(28)
@@ -614,6 +647,213 @@ def _draw_htp_modal_ingame(surface: pygame.Surface):
 
     #return the close button rect and example button rects so main can check clicks
     return close_rect, example_btns_screen
+
+
+def _draw_levels_modal(surface: pygame.Surface):
+    #draws the levels selection popup — shows all 25 levels with grid icons
+    global _levels_scroll_offset, _levels_scrollbar_thumb_rect, _levels_scrollbar_track_rect, _levels_max_scroll
+
+    sw, sh = surface.get_size()
+
+    backdrop = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    backdrop.fill((0, 0, 0, 170))
+    surface.blit(backdrop, (0, 0))
+
+    mw = _s(560)
+    mh = min(_s(520), sh - _s(40))
+    mx = (sw - mw) // 2
+    my = (sh - mh) // 2
+
+    HEADER_H    = _s(50)
+    SCROLLBAR_W = _s(10)
+    CONTENT_X   = mx + _s(8)
+    CONTENT_W   = mw - _s(16) - SCROLLBAR_W
+
+    font_title    = pygame.font.SysFont("Consolas", _s(20), bold=True)
+    font_num      = pygame.font.SysFont("Consolas", _s(11), bold=True)
+    font_name     = pygame.font.SysFont("Consolas", _s(10))
+
+    #card layout constants
+    CARD_COLS  = 3
+    CARD_GAP   = _s(8)
+    CARD_PAD   = _s(5)
+    LABEL_H    = _s(14)
+    ICON_H     = _s(72)
+    NAME_H     = _s(14)
+    card_w     = (CONTENT_W - CARD_GAP * (CARD_COLS - 1)) // CARD_COLS
+    card_h     = CARD_PAD + LABEL_H + _s(4) + ICON_H + _s(4) + NAME_H + CARD_PAD
+
+    all_levels = _get_all_levels()
+    n_rows_grid = math.ceil(len(all_levels) / CARD_COLS)
+    content_h  = _s(8) + n_rows_grid * (card_h + CARD_GAP) + _s(8)
+
+    viewport_h = mh - HEADER_H
+    max_scroll = max(0, content_h - viewport_h)
+    _levels_scroll_offset = min(_levels_scroll_offset, max_scroll)
+    _levels_max_scroll    = max_scroll
+
+    content_surf = pygame.Surface((CONTENT_W, content_h), pygame.SRCALPHA)
+    content_surf.fill((0, 0, 0, 0))
+
+    clickable_content = []  #(level_index, rect_on_content_surf)
+
+    for i, lv_data in enumerate(all_levels):
+        grid_row = i // CARD_COLS
+        grid_col = i % CARD_COLS
+        cx = grid_col * (card_w + CARD_GAP)
+        cy = _s(8) + grid_row * (card_h + CARD_GAP)
+        card_rect = pygame.Rect(cx, cy, card_w, card_h)
+
+        level_id   = lv_data["number"]
+        is_done    = level_id in _completed_level_ids
+        is_current = (i == manager._index)
+
+        #card background and border
+        if is_current and is_done:
+            bg_col  = (25, 50, 28, 210)
+            bdr_col = (80, 160, 80)
+        elif is_current:
+            bg_col  = (22, 38, 30, 200)
+            bdr_col = (55, 100, 65)
+        elif is_done:
+            bg_col  = (20, 35, 20, 190)
+            bdr_col = (55, 100, 55)
+        else:
+            bg_col  = (18, 18, 24, 170)
+            bdr_col = (45, 45, 60)
+
+        bg_s = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
+        bg_s.fill(bg_col)
+        content_surf.blit(bg_s, (cx, cy))
+        pygame.draw.rect(content_surf, bdr_col, card_rect, 1, border_radius=_s(4))
+
+        #"Level N" label at the top of the card
+        num_col  = (160, 230, 120) if is_done else (95, 95, 110)
+        num_surf = font_num.render(f"Level {level_id}", True, num_col)
+        content_surf.blit(num_surf, (cx + (card_w - num_surf.get_width()) // 2, cy + CARD_PAD))
+
+        #mini grid icon — cells scaled to fit the icon area
+        grid_str   = lv_data["grid"]
+        g_rows     = len(grid_str)
+        g_cols_num = len(grid_str[0])
+        icon_aw    = card_w - CARD_PAD * 2
+        cell       = max(2, min(icon_aw // g_cols_num, ICON_H // g_rows))
+        icon_w_px  = cell * g_cols_num
+        icon_h_px  = cell * g_rows
+        icon_x     = cx + (card_w - icon_w_px) // 2
+        icon_y     = cy + CARD_PAD + LABEL_H + _s(4) + (ICON_H - icon_h_px) // 2
+
+        for ri, row_s in enumerate(grid_str):
+            for ci, ch in enumerate(row_s):
+                cr = pygame.Rect(icon_x + ci * cell, icon_y + ri * cell, cell, cell)
+                if not is_done:
+                    fill, brd = (20, 20, 22), (32, 32, 36)
+                elif ch == "X":
+                    fill, brd = (100, 80, 60), (60, 40, 20)
+                else:
+                    fill, brd = (160, 210, 120), (80, 130, 60)
+                pygame.draw.rect(content_surf, fill, cr)
+                if cell >= 4:
+                    pygame.draw.rect(content_surf, brd, cr, 1)
+
+        #level name at the bottom of the card
+        name_col  = (200, 225, 195) if is_done else (85, 85, 95)
+        name_text = lv_data["name"]
+        name_surf = font_name.render(name_text, True, name_col)
+        #truncate if wider than card
+        while name_surf.get_width() > card_w - _s(4) and len(name_text) > 1:
+            name_text = name_text[:-1]
+            name_surf = font_name.render(name_text + "…", True, name_col)
+
+        name_y = cy + CARD_PAD + LABEL_H + _s(4) + ICON_H + _s(4)
+        content_surf.blit(name_surf, (cx + (card_w - name_surf.get_width()) // 2, name_y))
+
+        #current-level dot indicator in the top-right corner of the card
+        if is_current:
+            dot_col = (120, 220, 120) if is_done else (100, 160, 110)
+            pygame.draw.circle(content_surf, dot_col,
+                               (cx + card_w - CARD_PAD - _s(3), cy + CARD_PAD + _s(3)), _s(3))
+
+        if is_done:
+            clickable_content.append((i, card_rect))
+
+    #modal background panel
+    panel = pygame.Surface((mw, mh), pygame.SRCALPHA)
+    panel.fill((20, 28, 18, 245))
+    surface.blit(panel, (mx, my))
+
+    #green border
+    pygame.draw.rect(surface, (60, 140, 60), pygame.Rect(mx, my, mw, mh), _s(2), border_radius=_s(6))
+
+    #title
+    title_surf = font_title.render("Levels", True, (160, 230, 120))
+    surface.blit(title_surf, (mx + _s(16), my + _s(14)))
+
+    #header divider
+    pygame.draw.line(surface, (60, 120, 60),
+                     (mx + 8, my + HEADER_H - 4), (mx + mw - 8, my + HEADER_H - 4), 1)
+
+    #blit visible slice of the content surface
+    clip_rect = pygame.Rect(0, _levels_scroll_offset, CONTENT_W, viewport_h)
+    old_clip  = surface.get_clip()
+    surface.set_clip(pygame.Rect(mx, my + HEADER_H, mw, viewport_h - 18))
+    surface.blit(content_surf, (CONTENT_X, my + HEADER_H), clip_rect)
+    surface.set_clip(old_clip)
+
+    #fade gradient at bottom when more content is below
+    if _levels_scroll_offset < max_scroll:
+        fade_h    = 28
+        fade_surf = pygame.Surface((mw - 4, fade_h), pygame.SRCALPHA)
+        for fi in range(fade_h):
+            alpha = int(200 * fi / fade_h)
+            pygame.draw.line(fade_surf, (20, 28, 18, alpha),
+                             (0, fade_h - 1 - fi), (mw - 4, fade_h - 1 - fi))
+        surface.blit(fade_surf, (mx + 2, my + mh - fade_h - 2))
+
+    #scrollbar
+    if max_scroll > 0:
+        sb_x      = mx + mw - SCROLLBAR_W - 4
+        sb_y      = my + HEADER_H + 2
+        sb_h      = viewport_h - 4
+        thumb_h   = max(20, int(sb_h * viewport_h / content_h))
+        thumb_top = sb_y + int((sb_h - thumb_h) * _levels_scroll_offset / max_scroll)
+
+        _levels_scrollbar_track_rect = pygame.Rect(sb_x, sb_y, SCROLLBAR_W, sb_h)
+        _levels_scrollbar_thumb_rect = pygame.Rect(sb_x, thumb_top, SCROLLBAR_W, thumb_h)
+
+        pygame.draw.rect(surface, (40, 50, 40), _levels_scrollbar_track_rect, border_radius=4)
+        pygame.draw.rect(surface, (90, 160, 80), _levels_scrollbar_thumb_rect, border_radius=4)
+    else:
+        _levels_scrollbar_track_rect = None
+        _levels_scrollbar_thumb_rect = None
+
+    #close button
+    close_size    = _s(28)
+    cbx           = mx + mw - close_size - _s(6)
+    cby           = my + _s(6)
+    close_rect    = pygame.Rect(cbx, cby, close_size, close_size)
+    close_hovered = close_rect.collidepoint(pygame.mouse.get_pos())
+    close_col     = (200, 60, 60) if close_hovered else (140, 40, 40)
+    pygame.draw.rect(surface, close_col, close_rect, border_radius=_s(4))
+    pygame.draw.rect(surface, (220, 80, 80), close_rect, _s(1), border_radius=_s(4))
+    cpad = _s(7)
+    cxc  = cbx + close_size // 2
+    cyc  = cby + close_size // 2
+    pygame.draw.line(surface, (255, 255, 255), (cxc - cpad, cyc - cpad), (cxc + cpad, cyc + cpad), _s(2))
+    pygame.draw.line(surface, (255, 255, 255), (cxc + cpad, cyc - cpad), (cxc - cpad, cyc + cpad), _s(2))
+
+    #convert card rects from content-surface coords to screen coords
+    clickable_screen = []
+    for idx, cs_rect in clickable_content:
+        screen_rect = pygame.Rect(
+            CONTENT_X + cs_rect.x,
+            my + HEADER_H + cs_rect.y - _levels_scroll_offset,
+            cs_rect.width,
+            cs_rect.height,
+        )
+        clickable_screen.append((idx, screen_rect))
+
+    return close_rect, clickable_screen
 
 
 def _draw_start_screen(surface: pygame.Surface, pulse: float) -> pygame.Rect:
@@ -869,16 +1109,33 @@ def _reload_level() -> None:
 
 def _advance_level() -> None:
     #move to the next level, or reload the last level if there are no more
-    global level, farmer
+    global level, farmer, _completed_level_ids
     _stop_user_thread()
+    completed_id = manager._index + 1  #1-based level id that was just beaten
+    _completed_level_ids.add(completed_id)
     if not _IS_BROWSER and current_user:
         game_db.record_completion(
             current_user["username"],
-            manager._index + 1,
+            completed_id,
             level.objective.elapsed,
         )
     if not manager.next_level(*screen.get_size()):
         manager.reload(*screen.get_size())
+    level  = manager.current
+    farmer = Farmer(level.start_tile, level.TILE_SIZE)
+    farmer.snap_to_tile()
+    ide.clear_output()
+    ide.lines = [""]
+    ide.cursor_row = 0
+    ide.cursor_col = 0
+    ide.update_allowed(unlock_tree.effective_commands(level.objective.allowed_commands))
+
+
+def _jump_to_level(index: int) -> None:
+    #jump directly to any level by 0-based index (used by the levels modal)
+    global level, farmer
+    _stop_user_thread()
+    manager.jump_to_level(index, *screen.get_size())
     level  = manager.current
     farmer = Farmer(level.start_tile, level.TILE_SIZE)
     farmer.snap_to_tile()
@@ -1171,8 +1428,24 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     surface.blit(unlocks_lbl, (ux + (unlocks_w - unlocks_lbl.get_width())  // 2,
                                 uy + (unlocks_h - unlocks_lbl.get_height()) // 2))
 
-    #return all four button rects so the main loop can check for clicks
-    return center_btn_rect, htp_btn_rect, reset_btn_rect, unlocks_btn_rect
+    #levels button — directly below unlocks, same green theme
+    levels_btn_rect = pygame.Rect(ux, unlocks_btn_rect.bottom + _s(6), unlocks_w, unlocks_h)
+    levels_hovered  = levels_btn_rect.collidepoint(pygame.mouse.get_pos())
+
+    levels_bg_col = (20, 45, 20, 210) if levels_hovered else (10, 30, 10, 190)
+    levels_bg = pygame.Surface((unlocks_w, unlocks_h), pygame.SRCALPHA)
+    levels_bg.fill(levels_bg_col)
+    surface.blit(levels_bg, levels_btn_rect.topleft)
+
+    pygame.draw.rect(surface, (60, 110, 60), levels_btn_rect, _s(1), border_radius=_s(4))
+
+    font_levels = pygame.font.SysFont("Consolas", _s(14), bold=True)
+    levels_lbl  = font_levels.render("Levels", True, (140, 225, 140))
+    surface.blit(levels_lbl, (levels_btn_rect.x + (unlocks_w - levels_lbl.get_width())  // 2,
+                               levels_btn_rect.y + (unlocks_h - levels_lbl.get_height()) // 2))
+
+    #return all five button rects so the main loop can check for clicks
+    return center_btn_rect, htp_btn_rect, reset_btn_rect, unlocks_btn_rect, levels_btn_rect
 
 
 unlock_tree = UnlockTree()
@@ -1198,7 +1471,14 @@ async def main():
     global running, frozen, game_state, level, farmer
     global _btn_hovered, _pulse_timer, _current_btn_rect
     global _show_htp_ingame, _htp_ingame_close, _htp_scroll_offset
+    global _htp_scroll_velocity, _htp_scrollbar_dragging, _htp_scrollbar_drag_y, _htp_scrollbar_drag_off
+    global _htp_scrollbar_thumb_rect, _htp_scrollbar_track_rect, _htp_max_scroll
     global _htp_example_open, _htp_example_btns
+    global _show_levels_modal, _levels_modal_close, _levels_cards
+    global _levels_scroll_offset, _levels_scroll_velocity
+    global _levels_scrollbar_dragging, _levels_scrollbar_drag_y, _levels_scrollbar_drag_off
+    global _levels_scrollbar_thumb_rect, _levels_scrollbar_track_rect, _levels_max_scroll
+    global _completed_level_ids, _levels_btn
     global _center_btn, _htp_btn, _reset_btn, _unlocks_btn
     global _tech_tree_node_rects, _tech_tree_back_rect
     global frame_count
@@ -1294,16 +1574,55 @@ async def main():
                     frozen = False
                 continue
 
-            #scroll the how to play modal when the mouse wheel moves
-            if event.type == pygame.MOUSEWHEEL and _show_htp_ingame:
-                _htp_scroll(-event.y * 24)
-                continue
+            #mouse-wheel scroll for whichever modal is open
+            if event.type == pygame.MOUSEWHEEL:
+                if _show_htp_ingame:
+                    _htp_scroll_velocity += -event.y * 15
+                    continue
+                if _show_levels_modal:
+                    _levels_scroll_velocity += -event.y * 15
+                    continue
 
-            #escape key closes the how to play modal
-            if event.type == pygame.KEYDOWN:
-                if _show_htp_ingame and event.key == pygame.K_ESCAPE:
-                    _show_htp_ingame  = False
-                    _htp_example_open = None
+            #scrollbar thumb drag motion
+            if event.type == pygame.MOUSEMOTION:
+                if _htp_scrollbar_dragging:
+                    delta_y = event.pos[1] - _htp_scrollbar_drag_y
+                    if _htp_scrollbar_track_rect and _htp_scrollbar_thumb_rect:
+                        scrollable_track = _htp_scrollbar_track_rect.height - _htp_scrollbar_thumb_rect.height
+                        if scrollable_track > 0:
+                            ratio = delta_y / scrollable_track
+                            _htp_scroll_offset = max(0, min(_htp_max_scroll,
+                                int(_htp_scrollbar_drag_off + ratio * _htp_max_scroll)))
+                    continue
+                if _levels_scrollbar_dragging:
+                    delta_y = event.pos[1] - _levels_scrollbar_drag_y
+                    if _levels_scrollbar_track_rect and _levels_scrollbar_thumb_rect:
+                        scrollable_track = _levels_scrollbar_track_rect.height - _levels_scrollbar_thumb_rect.height
+                        if scrollable_track > 0:
+                            ratio = delta_y / scrollable_track
+                            _levels_scroll_offset = max(0, min(_levels_max_scroll,
+                                int(_levels_scrollbar_drag_off + ratio * _levels_max_scroll)))
+                    continue
+
+            #release either scrollbar drag
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if _htp_scrollbar_dragging:
+                    _htp_scrollbar_dragging = False
+                    continue
+                if _levels_scrollbar_dragging:
+                    _levels_scrollbar_dragging = False
+                    continue
+
+            #escape key closes whichever modal is open
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if _show_htp_ingame:
+                    _show_htp_ingame     = False
+                    _htp_example_open    = None
+                    _htp_scroll_velocity = 0.0
+                    continue
+                if _show_levels_modal:
+                    _show_levels_modal    = False
+                    _levels_scroll_velocity = 0.0
                     continue
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1311,8 +1630,29 @@ async def main():
                 if _show_htp_ingame:
                     #close button click
                     if _htp_ingame_close and _htp_ingame_close.collidepoint(event.pos):
-                        _show_htp_ingame  = False
-                        _htp_example_open = None
+                        _show_htp_ingame     = False
+                        _htp_example_open    = None
+                        _htp_scroll_velocity = 0.0
+                        continue
+
+                    #scrollbar thumb drag: start tracking mouse for smooth drag
+                    if _htp_scrollbar_thumb_rect and _htp_scrollbar_thumb_rect.collidepoint(event.pos):
+                        _htp_scrollbar_dragging = True
+                        _htp_scrollbar_drag_y   = event.pos[1]
+                        _htp_scrollbar_drag_off = _htp_scroll_offset
+                        _htp_scroll_velocity    = 0.0
+                        continue
+
+                    #scrollbar track click (outside thumb): jump scroll to clicked position
+                    if (_htp_scrollbar_track_rect and _htp_scrollbar_thumb_rect
+                            and _htp_scrollbar_track_rect.collidepoint(event.pos) and _htp_max_scroll > 0):
+                        track_h   = _htp_scrollbar_track_rect.height
+                        thumb_h   = _htp_scrollbar_thumb_rect.height
+                        track_top = _htp_scrollbar_track_rect.y
+                        ratio = max(0.0, min(1.0,
+                            (event.pos[1] - track_top - thumb_h // 2) / max(1, track_h - thumb_h)))
+                        _htp_scroll_offset   = int(ratio * _htp_max_scroll)
+                        _htp_scroll_velocity = 0.0
                         continue
 
                     #example button click toggles the code preview open or closed
@@ -1322,6 +1662,45 @@ async def main():
                                 _htp_example_open = None  #close if already open
                             else:
                                 _htp_example_open = key   #open the clicked one
+                            break
+
+                    continue
+
+                #handle clicks inside the levels modal
+                if _show_levels_modal:
+                    #close button
+                    if _levels_modal_close and _levels_modal_close.collidepoint(event.pos):
+                        _show_levels_modal      = False
+                        _levels_scroll_velocity = 0.0
+                        continue
+
+                    #scrollbar thumb drag
+                    if _levels_scrollbar_thumb_rect and _levels_scrollbar_thumb_rect.collidepoint(event.pos):
+                        _levels_scrollbar_dragging = True
+                        _levels_scrollbar_drag_y   = event.pos[1]
+                        _levels_scrollbar_drag_off = _levels_scroll_offset
+                        _levels_scroll_velocity    = 0.0
+                        continue
+
+                    #scrollbar track jump
+                    if (_levels_scrollbar_track_rect and _levels_scrollbar_thumb_rect
+                            and _levels_scrollbar_track_rect.collidepoint(event.pos) and _levels_max_scroll > 0):
+                        track_h   = _levels_scrollbar_track_rect.height
+                        thumb_h   = _levels_scrollbar_thumb_rect.height
+                        track_top = _levels_scrollbar_track_rect.y
+                        ratio = max(0.0, min(1.0,
+                            (event.pos[1] - track_top - thumb_h // 2) / max(1, track_h - thumb_h)))
+                        _levels_scroll_offset   = int(ratio * _levels_max_scroll)
+                        _levels_scroll_velocity = 0.0
+                        continue
+
+                    #level card click — jump to that level and close modal
+                    for idx, card_rect in _levels_cards:
+                        if card_rect.collidepoint(event.pos):
+                            _jump_to_level(idx)
+                            _show_levels_modal      = False
+                            _levels_scroll_velocity = 0.0
+                            frozen                  = False
                             break
 
                     continue
@@ -1336,9 +1715,10 @@ async def main():
 
                 #how to play button opens the modal
                 if _htp_btn and _htp_btn.collidepoint(event.pos):
-                    _show_htp_ingame   = True
-                    _htp_scroll_offset = 0
-                    _htp_example_open  = None
+                    _show_htp_ingame     = True
+                    _htp_scroll_offset   = 0
+                    _htp_scroll_velocity = 0.0
+                    _htp_example_open    = None
                     continue
 
                 #reset button restarts the level
@@ -1348,6 +1728,15 @@ async def main():
 
                 if _unlocks_btn and _unlocks_btn.collidepoint(event.pos):
                     game_state = STATE_TECH_TREE
+                    continue
+
+                #levels button opens the levels modal
+                if _levels_btn and _levels_btn.collidepoint(event.pos):
+                    _show_levels_modal      = True
+                    _levels_scroll_offset   = 0
+                    _levels_scroll_velocity = 0.0
+                    if not _IS_BROWSER and current_user:
+                        _completed_level_ids = game_db.get_completed_level_ids(current_user["username"])
                     continue
 
             #pass the event to the ide and check if the run button was pressed
@@ -1377,6 +1766,8 @@ async def main():
                 auth_ui.reset_form()
                 game_state = STATE_PLAYING
                 level.center_on(*screen.get_size())
+                if not _IS_BROWSER:
+                    _completed_level_ids = game_db.get_completed_level_ids(current_user["username"])
 
         #draw the auth screen while waiting for the player to log in
         if game_state == STATE_AUTH:
@@ -1427,7 +1818,7 @@ async def main():
             level.draw(screen)
             farmer.draw(screen)
             ide.draw(screen)
-            _center_btn, _htp_btn, _reset_btn, _unlocks_btn = _draw_hud(screen, level)
+            _center_btn, _htp_btn, _reset_btn, _unlocks_btn, _levels_btn = _draw_hud(screen, level)
             obj = level.objective
             overlay.draw(
                 screen,
@@ -1473,12 +1864,25 @@ async def main():
         ide.update(dt)
         level.update(dt, pygame.mouse.get_pos())
 
+        #apply scroll inertia each frame — decay velocity and nudge the offset
+        if _show_htp_ingame and abs(_htp_scroll_velocity) > 0.1:
+            _htp_scroll_offset = max(0, min(_htp_max_scroll, _htp_scroll_offset + int(_htp_scroll_velocity)))
+            _htp_scroll_velocity *= 0.82
+            if abs(_htp_scroll_velocity) < 0.5 or _htp_scroll_offset in (0, _htp_max_scroll):
+                _htp_scroll_velocity = 0.0
+
+        if _show_levels_modal and abs(_levels_scroll_velocity) > 0.1:
+            _levels_scroll_offset = max(0, min(_levels_max_scroll, _levels_scroll_offset + int(_levels_scroll_velocity)))
+            _levels_scroll_velocity *= 0.82
+            if abs(_levels_scroll_velocity) < 0.5 or _levels_scroll_offset in (0, _levels_max_scroll):
+                _levels_scroll_velocity = 0.0
+
         #draw the environment in the correct order so things stack properly
         background.draw(screen)
         level.draw(screen)
         farmer.draw(screen)
         ide.draw(screen)
-        _center_btn, _htp_btn, _reset_btn, _unlocks_btn = _draw_hud(screen, level)
+        _center_btn, _htp_btn, _reset_btn, _unlocks_btn, _levels_btn = _draw_hud(screen, level)
 
         #draw the how to play modal on top if it is open
         if _show_htp_ingame:
@@ -1486,6 +1890,13 @@ async def main():
         else:
             _htp_ingame_close  = None
             _htp_example_btns  = []
+
+        #draw the levels modal on top if it is open
+        if _show_levels_modal:
+            _levels_modal_close, _levels_cards = _draw_levels_modal(screen)
+        else:
+            _levels_modal_close = None
+            _levels_cards       = []
 
         #push the finished frame to the display
         pygame.display.flip()
