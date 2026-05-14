@@ -1357,11 +1357,12 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
     by    = ty + time_box_h + _s(6)
 
     #shrink button height if all 5 buttons + gaps won't fit in the remaining screen space
-    _n_btns     = 5
-    _gap_total  = _s(6) * (_n_btns - 1)
-    _avail      = surface.get_height() - by - _s(10)
+    _n_btns    = 5
+    _gap_total = _s(6) * (_n_btns - 1)
+    _avail     = surface.get_height() - by - _s(10)
     if _n_btns * btn_h + _gap_total > _avail:
-        btn_h = max(_s(26), (_avail - _gap_total) // _n_btns)
+        #use plain pixels (not _s()) for the minimum so high-DPR screens don't force an overflow
+        btn_h = max(20, (_avail - _gap_total) // _n_btns)
 
     center_btn_rect = pygame.Rect(bx, by, btn_w, btn_h)
     btn_hovered     = center_btn_rect.collidepoint(pygame.mouse.get_pos())

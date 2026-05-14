@@ -1,6 +1,7 @@
 # Build directories
-build/
 cmake-build-*/
+# ignore pygbag cache but keep the deployable web bundle
+pygame/build/web-cache/
 
 # Compiled binaries
 *.exe
