@@ -1444,10 +1444,11 @@ def _draw_hud(surface: pygame.Surface, lv) -> tuple:
                                 uy + (unlocks_h - unlocks_lbl.get_height()) // 2))
 
     #levels button — directly below unlocks, same green theme
-    #clamp position so it always fits within the surface even on very short canvases
+    #clamp position so it always fits within the surface even on very short canvases.
+    #also floor max_y at 0 so we never get pushed off the TOP edge on a tiny canvas.
     levels_x = ux
     levels_y = uy + unlocks_h + gap
-    max_y    = surface.get_height() - unlocks_h - _s(2)
+    max_y    = max(0, surface.get_height() - unlocks_h - _s(2))
     if levels_y > max_y:
         levels_y = max_y
     levels_btn_rect = pygame.Rect(levels_x, levels_y, unlocks_w, unlocks_h)
